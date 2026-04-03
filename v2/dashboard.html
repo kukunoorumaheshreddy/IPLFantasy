@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IPL Fantasy League — Ranking Dashboard v5</title>
+  <title>Big Blue Championship 2026 — IPL Fantasy Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -243,6 +243,22 @@
       margin-bottom: 16px;
       width: fit-content;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
+    @keyframes swing { 0% { transform: rotate(-30deg); } 50% { transform: rotate(30deg); } 100% { transform: rotate(-30deg); } }
+    @keyframes fadeInOut { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+    .cricket-loader { display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 0;gap:24px; }
+    .cricket-scene { position:relative;width:200px;height:120px; }
+    .cricket-ball { position:absolute;left:50%;top:50%;margin-left:-20px;margin-top:-20px;width:40px;height:40px;background:radial-gradient(circle at 35% 35%, #e74c3c, #c0392b);border-radius:50%;box-shadow:0 4px 15px rgba(231,76,60,0.4);animation:bounce 0.8s ease-in-out infinite; }
+    .cricket-ball::after { content:'';position:absolute;top:8px;left:5px;width:28px;height:22px;border:2px solid rgba(255,255,255,0.5);border-radius:50%;transform:rotate(-20deg); }
+    .cricket-bat { position:absolute;left:20px;top:30px;width:14px;height:70px;background:linear-gradient(to bottom, #f39c12, #e67e22);border-radius:4px 4px 2px 2px;transform-origin:bottom center;animation:swing 1.2s ease-in-out infinite;box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .cricket-bat::after { content:'';position:absolute;bottom:-18px;left:4px;width:6px;height:20px;background:linear-gradient(to bottom, #8e6b2e, #6b4f1e);border-radius:2px; }
+    .cricket-stumps { position:absolute;right:25px;bottom:10px;display:flex;gap:4px; }
+    .cricket-stump { width:4px;height:50px;background:linear-gradient(to bottom, #ecf0f1, #bdc3c7);border-radius:1px; }
+    .cricket-bail { position:absolute;top:-4px;width:18px;height:4px;background:#f1c40f;border-radius:2px; }
+    .cricket-bail:first-child { left:0; }
+    .cricket-bail:nth-child(2) { left:8px; }
+    .loader-text { color:var(--text-dim);font-size:15px;animation:fadeInOut 2s ease-in-out infinite; }
     .view-tab {
       padding: 8px 20px;
       border-radius: 6px;
@@ -261,12 +277,28 @@
 </head>
 <body>
   <header>
-    <h1>🏏 IPL Fantasy League — Ranking Dashboard</h1>
+    <h1>🏏 Big Blue Championship — IPL Fantasy 2026</h1>
     <p>Track how each team's ranking progresses through the tournament</p>
   </header>
 
   <div class="container">
-    <!-- Loading indicator (hidden for public) -->
+    <!-- Loading animation -->
+    <div id="loadingSpinner" class="cricket-loader">
+      <div class="cricket-scene">
+        <div class="cricket-bat"></div>
+        <div class="cricket-ball"></div>
+        <div class="cricket-stumps">
+          <div class="cricket-bail"></div>
+          <div class="cricket-bail"></div>
+          <div class="cricket-stump"></div>
+          <div class="cricket-stump"></div>
+          <div class="cricket-stump"></div>
+        </div>
+      </div>
+      <p class="loader-text">🏏 Setting up the pitch...</p>
+    </div>
+
+    <!-- Old auto-load status (hidden) -->
     <div id="autoLoadStatus" style="display:none;">
       <div class="instructions">
         <h3>⏳ Auto-loading latest data...</h3>
@@ -463,6 +495,8 @@
     // ---- Auto-load: try master-snapshots/ipl-fantasy-v2-master-gdN.json from high to low ----
     (async function autoLoad() {
       const statusEl = document.getElementById('autoLoadStatus');
+      const loadStart = Date.now();
+      const MIN_SPLASH_MS = 2500; // Show cricket animation for at least 2.5 seconds
 
       // Try gd70 down to gd1 (IPL has max 70 matches)
       for (let gd = 70; gd >= 1; gd--) {
@@ -475,6 +509,8 @@
           const data = JSON.parse(await res.text());
           if (data && data.gamedays && data.gamedays.length > 0) {
             currentFileName = `ipl-fantasy-v2-master-gd${gd}.json`;
+            const elapsed = Date.now() - loadStart;
+            if (elapsed < MIN_SPLASH_MS) await new Promise(r => setTimeout(r, MIN_SPLASH_MS - elapsed));
             statusEl.style.display = 'none';
             processData(data);
             console.log(`[Dashboard] Auto-loaded ${currentFileName} (${data.gamedays.length} matches)`);
@@ -496,6 +532,7 @@
     // ---- Data processing ----
     function processData(data) {
       rawData = data;
+      document.getElementById('loadingSpinner').style.display = 'none';
       document.getElementById('uploadSection').style.display = 'none';
       document.getElementById('autoLoadStatus').style.display = 'none';
       document.getElementById('dashboard').classList.add('visible');
