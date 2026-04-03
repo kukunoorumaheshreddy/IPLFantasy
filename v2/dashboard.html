@@ -287,14 +287,14 @@
         </ol>
       </div>
 
-      <div class="upload-zone" id="dropZone">
+      <div class="upload-zone" id="dropZone" style="display:none;">
         <h2>📂 Load League Data</h2>
         <p>Drag &amp; drop your JSON file here, or click to browse</p>
         <button class="btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
         <input type="file" id="fileInput" accept=".json" />
       </div>
 
-      <div class="instructions" style="margin-top:16px;">
+      <div class="instructions" style="margin-top:16px;display:none;">
         <h3>💡 Or paste JSON data directly</h3>
         <textarea id="jsonPaste" rows="6" style="width:100%;background:#2a2d3a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;resize:vertical;" placeholder="Paste your JSON data here..."></textarea>
         <button class="btn" style="margin-top:12px;" onclick="loadFromPaste()">Load Pasted Data</button>
@@ -307,7 +307,7 @@
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
         <span style="color:var(--text-dim);font-size:14px;">📄 Loaded:</span>
         <strong id="loadedFile" style="font-size:14px;color:var(--accent-light);">—</strong>
-        <button class="btn" style="padding:6px 16px;font-size:13px;" onclick="document.getElementById('switchFileInput').click()">Load Different Snapshot</button>
+        <button class="btn" style="padding:6px 16px;font-size:13px;display:none;" onclick="document.getElementById('switchFileInput').click()">Load Different Snapshot</button>
         <input type="file" id="switchFileInput" accept=".json" style="display:none;" />
       </div>
 
