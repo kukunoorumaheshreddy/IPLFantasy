@@ -12,7 +12,7 @@
 //   2. Open DevTools (F12) → Console
 //   3. Paste this entire script → Enter
 //   4. Wait ~30-60 seconds
-//   5. JSON file downloads automatically
+//   5. Save the JSON file into master-snapshots/ folder
 //   6. Save to master-snapshots/ folder under v2/
 // ============================================================
 

@@ -37,21 +37,20 @@ Open [`update-data.js`](https://github.com/kukunoorumaheshreddy/IPLFantasy/blob/
 
 The script fetches data for all 12 league members across all completed matches. You'll see progress in the console.
 
-When done: `✅ Done! Downloading ipl-fantasy-v2-master-gd{N}.json`
+When done, a **Save File dialog** will appear with the filename `ipl-fantasy-v2-master-gd{N}.json`.
 
-### Step 5: Upload the JSON file
+### Step 5: Save the file to the repo
 
-The file auto-downloads to your Downloads folder — named `ipl-fantasy-v2-master-gd{N}.json`.
+Save (or move) the file directly into the `master-snapshots/` folder in your local clone of this repo. **Make sure the gameday number (gdN) in the filename is correct** — it should match the latest completed match.
 
-**Option A** (if you have git access):
+Then push to GitHub:
 ```bash
-# Move the file into master-snapshots/, then:
 git add master-snapshots/
 git commit -m "Match N data"
 git push
 ```
 
-**Option B**: Just send the file to Mahesh — he'll upload it.
+> 💡 If you don't have git access, just send the JSON file to Mahesh — he'll upload it.
 
 ---
 
@@ -60,7 +59,7 @@ git push
 | When | What | How | Required? |
 |------|------|-----|-----------|
 | After each match | Pull latest data | Paste `update-data.js` in console | ✅ Yes |
-| After download | Upload to repo | Move to `master-snapshots/` + git push | ✅ Yes |
+| After download | Save to repo | Save into `master-snapshots/` + git push | ✅ Yes |
 | Any time | View dashboard | [Open dashboard](https://kukunoorumaheshreddy.github.io/IPLFantasy/dashboard.html) | — |
 
 ---
