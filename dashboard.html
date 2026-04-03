@@ -400,7 +400,6 @@
         <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
         <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
         <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
-        <button class="view-tab" data-view="pointsAnim" onclick="switchView('pointsAnim')">Points Progression</button>
       </div>
 
       <!-- Rank Chart -->
@@ -445,46 +444,49 @@
         <div class="heatmap-scroll" id="heatmapContainer"></div>
       </div>
 
-      <!-- Bar Chart Race -->
+      <!-- Points Race: side-by-side bar race + line progression -->
       <div class="chart-section" id="raceView" style="display:none;">
         <h3>Cumulative Points Race</h3>
-        <p class="subtitle">Watch teams accumulate points match by match. Bars auto-sort by total.</p>
-        <div class="race-wrap">
-          <div class="race-ctrls">
-            <button id="racePlayBtn" onclick="toggleRace()">▶ Play</button>
-            <button onclick="raceStep(-1)">⏮</button>
-            <button onclick="raceStep(1)">⏭</button>
-            <input type="range" id="raceSlider" min="0" max="0" value="0" oninput="raceSeek(+this.value)" style="flex:1;min-width:100px;accent-color:var(--accent);" />
-            <span class="rlabel" id="raceLabel">—</span>
-            <select id="raceSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
-              <option value="3000">Slow</option>
-              <option value="1800" selected>Normal</option>
-              <option value="1000">Fast</option>
-            </select>
+        <p class="subtitle">Bar race (left) shows live rankings · Line chart (right) traces point trajectories over time.</p>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+          <!-- Left: Bar Race -->
+          <div style="flex:1;min-width:320px;">
+            <div class="race-wrap">
+              <div class="race-ctrls">
+                <button id="racePlayBtn" onclick="toggleRace()">▶ Play</button>
+                <button onclick="raceStep(-1)">⏮</button>
+                <button onclick="raceStep(1)">⏭</button>
+                <input type="range" id="raceSlider" min="0" max="0" value="0" oninput="raceSeek(+this.value)" style="flex:1;min-width:60px;accent-color:var(--accent);" />
+                <span class="rlabel" id="raceLabel">—</span>
+                <select id="raceSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
+                  <option value="3000">Slow</option>
+                  <option value="1800" selected>Normal</option>
+                  <option value="1000">Fast</option>
+                </select>
+              </div>
+              <div id="raceBars"></div>
+            </div>
           </div>
-          <div id="raceBars"></div>
+          <!-- Right: Line Progression -->
+          <div style="flex:1;min-width:320px;">
+            <div class="race-ctrls" id="ptsAnimCtrls" style="margin-bottom:8px;">
+              <button onclick="ptsAnimToggle()">▶ Play</button>
+              <button onclick="ptsAnimStep(-1)">⏮</button>
+              <button onclick="ptsAnimStep(1)">⏭</button>
+              <input type="range" id="ptsAnimSlider" min="0" max="1000" value="1000" oninput="ptsAnimSeek(+this.value)" style="flex:1;min-width:60px;accent-color:var(--accent);" />
+              <span class="rlabel" id="ptsAnimLabel" style="min-width:80px;">—</span>
+              <select id="ptsAnimSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
+                <option value="3000">Slow</option>
+                <option value="1800" selected>Normal</option>
+                <option value="1000">Fast</option>
+              </select>
+            </div>
+            <div style="position:relative;height:500px;background:var(--surface);border-radius:8px;overflow:hidden;">
+              <canvas id="ptsAnimCanvas" style="width:100%;height:100%;"></canvas>
+            </div>
+            <div id="ptsAnimLegend" style="display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;padding:12px 0;"></div>
+          </div>
         </div>
-      </div>
-      <!-- Points Progression (Animated) -->
-      <div class="chart-section" id="pointsAnimView" style="display:none;">
-        <h3>Points Progression</h3>
-        <p class="subtitle">Watch cumulative points build up match by match.</p>
-        <div class="race-ctrls" id="ptsAnimCtrls" style="margin-bottom:8px;">
-          <button onclick="ptsAnimToggle()">▶ Play</button>
-          <button onclick="ptsAnimStep(-1)">⏮</button>
-          <button onclick="ptsAnimStep(1)">⏭</button>
-          <input type="range" id="ptsAnimSlider" min="0" max="1000" value="1000" oninput="ptsAnimSeek(+this.value)" style="flex:1;min-width:100px;accent-color:var(--accent);" />
-          <span class="rlabel" id="ptsAnimLabel" style="min-width:80px;">—</span>
-          <select id="ptsAnimSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
-            <option value="3000">Slow</option>
-            <option value="1800" selected>Normal</option>
-            <option value="1000">Fast</option>
-          </select>
-        </div>
-        <div style="position:relative;height:500px;background:var(--surface);border-radius:8px;overflow:hidden;">
-          <canvas id="ptsAnimCanvas" style="width:100%;height:100%;"></canvas>
-        </div>
-        <div id="ptsAnimLegend" style="display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;padding:12px 0;"></div>
       </div>
 
     </div>
@@ -1208,9 +1210,8 @@
       document.getElementById('matchLbView').style.display = view === 'matchLb' ? '' : 'none';
       document.getElementById('heatmapView').style.display = view === 'heatmap' ? '' : 'none';
       document.getElementById('raceView').style.display = view === 'race' ? '' : 'none';
-      document.getElementById('pointsAnimView').style.display = view === 'pointsAnim' ? '' : 'none';
       if (view === 'race') stopRace();
-      if (view !== 'pointsAnim') ptsAnimStop();
+      if (view !== 'race') ptsAnimStop();
     }
 
     // ---- Standings Table ----
