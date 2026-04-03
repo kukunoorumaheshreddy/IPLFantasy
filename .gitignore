@@ -1,6 +1,3 @@
-# v1 is legacy, not needed for public dashboard
-v1/
-
 # Local-only files
 start-dashboard.bat
 HANDOFF.md
