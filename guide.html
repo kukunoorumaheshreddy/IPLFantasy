@@ -76,111 +76,55 @@
 
 <div class="container">
 
-  <!-- FILES OVERVIEW -->
+  <!-- WHAT IS THIS -->
   <div class="card">
-    <h2>📁 Your Files</h2>
-    <p>These are the only files you need. Everything else has been cleaned up.</p>
-    <div class="file-list">
-      <div class="fname">dashboard.html</div>
-      <div class="fdesc">Original dashboard — rank progression, points, standings, per-match leaderboard</div>
-      <div class="fname">dashboard-v2.html</div>
-      <div class="fdesc">Enhanced dashboard — adds improved bump chart, rank heatmap, animated points race</div>
-      <div class="fname">update-data.js</div>
-      <div class="fdesc">🔑 <strong>Main script</strong> — run after matches to update your master data file</div>
-      <div class="fname">live-poll.js</div>
-      <div class="fdesc">Optional — captures intra-match snapshots every 10 min during live matches</div>
-      <div class="fname">fetch-data.js</div>
-      <div class="fdesc">Legacy — full extraction script (replaced by update-data.js, kept as backup)</div>
-      <div class="fname">ipl-fantasy-master-gdN.json</div>
-      <div class="fdesc">Your data file — one per match day (e.g. gd7, gd8). Latest one goes into the dashboard.</div>
-    </div>
+    <h2>🏟️ What Is This?</h2>
+    <p>A live dashboard for our <strong>Big Blue Championship</strong> IPL Fantasy league. It auto-updates after each match — just visit:</p>
+    <p style="text-align:center;margin:16px 0;">
+      <a href="https://kukunoorumaheshreddy.github.io/IPLFantasy/dashboard.html" style="color:var(--accent-light);font-size:18px;font-weight:700;">
+        kukunoorumaheshreddy.github.io/IPLFantasy/dashboard.html
+      </a>
+    </p>
+    <p>Someone from the league needs to run a quick script after each match to pull the latest data. Here's how.</p>
   </div>
 
-  <div class="section-divider">Match Day Workflow</div>
-
-  <!-- BEFORE MATCH -->
-  <div class="card">
-    <h2><span class="badge badge-before">Before</span> Before the Match Starts</h2>
-    <p>Do this <strong>5–10 minutes before</strong> the first ball is bowled.</p>
-
-    <div class="timeline">
-      <div class="step" data-step="1">
-        <h4>Open the fantasy website</h4>
-        <p>Go to <a href="https://fantasy.iplt20.com/classic/home" style="color:var(--accent-light)">fantasy.iplt20.com</a> and make sure you're <strong>logged in</strong>.</p>
-      </div>
-      <div class="step" data-step="2">
-        <h4>Open browser DevTools</h4>
-        <p>Press <code>F12</code> → click the <strong>Console</strong> tab.</p>
-      </div>
-      <div class="step" data-step="3">
-        <h4>Start the live polling script</h4>
-        <p>Copy the <strong>entire contents</strong> of <code>live-poll.js</code> and paste into the console. Press Enter.</p>
-        <p>You'll see: <code>[LivePoll] Found live match: GD 8 — RCB vs MI</code></p>
-      </div>
-      <div class="step" data-step="4">
-        <h4>Leave the tab open</h4>
-        <p>The script captures a snapshot every <strong>10 minutes</strong> automatically. Don't close the tab or put the laptop to sleep.</p>
-      </div>
-    </div>
-
-    <div class="tip">If no match is live yet, the script will say "No live match found." Just wait and try again once the match starts.</div>
-    <div class="warning">This step is <strong>optional</strong>. It only captures intra-match progression. If you skip it, you'll still have the final match data.</div>
-  </div>
-
-  <!-- DURING MATCH -->
-  <div class="card">
-    <h2><span class="badge badge-during">During</span> During the Match</h2>
-    <p>Nothing to do! Just keep the browser tab open.</p>
-
-    <ul>
-      <li>The console will log each snapshot: <code>[LivePoll] Snapshot #3 at 2026-04-04T15:30:00Z</code></li>
-      <li>You'll see the current leader and total points at each capture</li>
-      <li>If the match ends, the script <strong>auto-stops</strong> and downloads the snapshot file</li>
-    </ul>
-
-    <h3>If your session expires during polling</h3>
-    <p>Don't worry — all snapshots are <strong>saved in localStorage</strong> automatically. You'll see:</p>
-    <pre>[LivePoll] ⚠️ SESSION EXPIRED! Snapshots are safe in localStorage.
-[LivePoll] ➡️ Re-login to fantasy.iplt20.com, then paste this script again.</pre>
-    <p>Just <strong>re-login</strong> and <strong>paste the script again</strong>. It will find the saved snapshots and resume from where it left off.</p>
-    <div class="tip">The browser tab title will change to "⚠️ SESSION EXPIRED" so you'll notice even if the console is closed.</div>
-    <p>Type this in the console:</p>
-    <pre>stopPolling()</pre>
-    <p>It will immediately download all collected snapshots as a JSON file.</p>
-  </div>
+  <div class="section-divider">After Each Match (The Only Required Step)</div>
 
   <!-- AFTER MATCH -->
   <div class="card">
-    <h2><span class="badge badge-after">After</span> After the Match Completes</h2>
-    <p>Do this <strong>once the match result is final</strong> (usually 30 min after the match ends to let points settle).</p>
+    <h2><span class="badge badge-after">After</span> Pull Match Data</h2>
+    <p>Do this <strong>once points are finalized</strong> — usually 30–60 min after the match ends.</p>
 
     <div class="timeline">
       <div class="step" data-step="1">
-        <h4>Open fantasy.iplt20.com (if not already open)</h4>
-        <p>Make sure you're <strong>logged in</strong>. Open <code>F12</code> → Console.</p>
+        <h4>Go to fantasy.iplt20.com and log in</h4>
+        <p>Open <a href="https://fantasy.iplt20.com/classic/home" style="color:var(--accent-light)">fantasy.iplt20.com</a> in Chrome/Edge. Make sure you're <strong>logged in</strong> to your IPL Fantasy account.</p>
       </div>
       <div class="step" data-step="2">
-        <h4>Run the update script</h4>
-        <p>Copy the <strong>entire contents</strong> of <code>update-data.js</code> and paste into the console. Press Enter.</p>
+        <h4>Open the browser console</h4>
+        <p>Press <code>F12</code> (or right-click → Inspect), then click the <strong>Console</strong> tab.</p>
       </div>
       <div class="step" data-step="3">
-        <h4>Load your existing data (if you have it)</h4>
-        <p>A file picker will appear. Select your existing <code>ipl-fantasy-master.json</code>.</p>
-        <p>If this is your first time, just <strong>wait 30 seconds</strong> or press Cancel — it'll fetch everything from scratch.</p>
+        <h4>Paste the extraction script</h4>
+        <p>Open <code>update-data.js</code> from the repo (<a href="https://github.com/kukunoorumaheshreddy/IPLFantasy/blob/main/update-data.js" style="color:var(--accent-light)">view on GitHub</a>), copy the <strong>entire file</strong>, paste it into the console, and press <strong>Enter</strong>.</p>
+        <div class="tip">If Chrome warns "Don't paste code you don't understand" — type <code>allow pasting</code> and press Enter first, then paste the script.</div>
       </div>
       <div class="step" data-step="4">
-        <h4>Wait for it to finish</h4>
-        <p>The script only fetches <strong>new matches</strong> (skips ones already in your file). It takes ~30 seconds per new match.</p>
-        <p>You'll see: <code>[Update] ✅ Done! Downloaded: ipl-fantasy-master-gd8.json</code></p>
+        <h4>Wait ~30–60 seconds</h4>
+        <p>The script fetches data for all 12 league members across all completed matches. You'll see progress in the console.</p>
+        <p>When done: <code>✅ Done! Downloading ipl-fantasy-v3-master-gd8.json</code></p>
       </div>
       <div class="step" data-step="5">
-        <h4>View the dashboard</h4>
-        <p>Open <code>dashboard-v2.html</code> (or <code>dashboard.html</code>) in your browser. Drag & drop or click to load your latest <code>ipl-fantasy-master-gdN.json</code> file.</p>
+        <h4>Send the downloaded JSON file</h4>
+        <p>The file auto-downloads to your Downloads folder. It's named <code>ipl-fantasy-v2-master-gd{N}.json</code> where N is the latest match number.</p>
+        <p><strong>Option A:</strong> If you have git access to the repo, move the file into <code>master-snapshots/</code> and push:</p>
+        <pre>git add master-snapshots/ && git commit -m "Match N data" && git push</pre>
+        <p><strong>Option B:</strong> Just send the file to Mahesh — he'll upload it.</p>
       </div>
     </div>
 
-    <div class="tip">Each run creates a new file like <code>ipl-fantasy-master-gd8.json</code>. Always load the latest one in the dashboard. Old files are your natural backups — no need to manage them.</div>
-    <div class="warning">If the match was still in progress when you extracted, re-run <code>update-data.js</code> after it finishes — it will automatically re-fetch any previously live match with final scores.</div>
+    <div class="warning">You must be <strong>logged in</strong> to fantasy.iplt20.com in the same browser tab. The script uses your session to access the league API.</div>
+    <div class="tip">The script fetches everything from scratch each time — no need to keep old files or load previous data. Just paste and go.</div>
   </div>
 
   <div class="section-divider">Quick Reference</div>
@@ -193,34 +137,28 @@
         <tr style="border-bottom:2px solid var(--border);">
           <th style="text-align:left;padding:8px;color:var(--dim);">When</th>
           <th style="text-align:left;padding:8px;color:var(--dim);">What</th>
-          <th style="text-align:left;padding:8px;color:var(--dim);">Script</th>
+          <th style="text-align:left;padding:8px;color:var(--dim);">How</th>
           <th style="text-align:left;padding:8px;color:var(--dim);">Required?</th>
         </tr>
       </thead>
       <tbody>
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:8px;">Before match</td>
-          <td style="padding:8px;">Start live polling</td>
-          <td style="padding:8px;"><code>live-poll.js</code></td>
-          <td style="padding:8px;color:var(--yellow);">Optional</td>
+          <td style="padding:8px;">After each match</td>
+          <td style="padding:8px;">Pull latest data</td>
+          <td style="padding:8px;">Paste <code>update-data.js</code> in console</td>
+          <td style="padding:8px;color:var(--green);font-weight:700;">Yes ✓</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:8px;">During match</td>
-          <td style="padding:8px;">Keep tab open</td>
-          <td style="padding:8px;">—</td>
-          <td style="padding:8px;color:var(--dim);">—</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:8px;">After match</td>
-          <td style="padding:8px;">Update master data</td>
-          <td style="padding:8px;"><code>update-data.js</code></td>
-          <td style="padding:8px;color:var(--green);font-weight:700;">Required ✓</td>
+          <td style="padding:8px;">After download</td>
+          <td style="padding:8px;">Upload to repo</td>
+          <td style="padding:8px;">Move to <code>master-snapshots/</code> + git push</td>
+          <td style="padding:8px;color:var(--green);font-weight:700;">Yes ✓</td>
         </tr>
         <tr>
           <td style="padding:8px;">Any time</td>
           <td style="padding:8px;">View dashboard</td>
-          <td style="padding:8px;"><code>dashboard-v2.html</code></td>
-          <td style="padding:8px;color:var(--green);font-weight:700;">—</td>
+          <td style="padding:8px;"><a href="https://kukunoorumaheshreddy.github.io/IPLFantasy/dashboard.html" style="color:var(--accent-light)">Open live dashboard</a></td>
+          <td style="padding:8px;color:var(--dim);">—</td>
         </tr>
       </tbody>
     </table>
@@ -231,47 +169,37 @@
     <h2>🔧 Troubleshooting</h2>
 
     <h3>"No completed gamedays" or empty data</h3>
-    <p>You're not logged in. Go to <a href="https://fantasy.iplt20.com/classic/home" style="color:var(--accent-light)">fantasy.iplt20.com</a>, log in, then run the script again in the same tab.</p>
+    <p>You're not logged in. Go to <a href="https://fantasy.iplt20.com/classic/home" style="color:var(--accent-light)">fantasy.iplt20.com</a>, log in, then run the script again <strong>in the same tab</strong>.</p>
 
-    <h3>File picker didn't appear (update-data.js)</h3>
-    <p>Your browser may have blocked the popup. Just wait 30 seconds — the script will proceed without existing data and fetch everything fresh.</p>
+    <h3>Chrome says "Don't paste code you don't understand"</h3>
+    <p>Type <code>allow pasting</code> in the console and press Enter. Then paste the script.</p>
 
-    <h3>Points don't match the fantasy app exactly</h3>
-    <p>Small differences are expected due to <strong>boosters</strong> (power-ups some players activate). The script doesn't account for those yet. Differences should be small (under 50 pts).</p>
+    <h3>Script seems stuck / no download after 2 minutes</h3>
+    <p>Check the console for red errors. Most likely your session expired — refresh the page, log in again, then re-paste the script.</p>
 
-    <h3>"stopPolling is not defined"</h3>
-    <p>The page was refreshed or the script wasn't running. But your snapshots are safe in <strong>localStorage</strong> — just paste the script again and it will pick them up. Then call <code>stopPolling()</code>.</p>
+    <h3>Dashboard shows "No data loaded"</h3>
+    <p>The JSON file hasn't been pushed to the repo yet. Make sure the file is in the <code>master-snapshots/</code> folder and pushed to GitHub.</p>
 
-    <h3>Dashboard shows flat lines (same rank every match)</h3>
-    <p>You loaded old data from the v1 script. Re-run <code>update-data.js</code> to get proper per-match data, then reload the dashboard.</p>
+    <h3>Points look slightly different from the fantasy app</h3>
+    <p>The script accounts for boosters (power-ups), but some edge cases may cause small differences. These are cosmetic and don't affect rankings.</p>
   </div>
 
   <!-- HOW IT WORKS -->
   <div class="card">
-    <h2>🧠 How It Works (Technical)</h2>
-    <p>For the curious — here's what the scripts do under the hood.</p>
+    <h2>🧠 How It Works (For the Curious)</h2>
 
     <h3>update-data.js</h3>
     <ol>
-      <li>Loads your existing <code>ipl-fantasy-master.json</code> (if provided)</li>
-      <li>Fetches the match schedule from the IPL Fantasy API to find completed matches</li>
-      <li>Compares with your existing data — <strong>only fetches new matches</strong></li>
-      <li>For each new match: gets every player's fantasy points, then each league member's team composition</li>
-      <li>Calculates team scores: captain ×2, vice-captain ×1.5, rest ×1</li>
-      <li>Rebuilds cumulative rankings across all matches</li>
-      <li>Downloads the merged master file</li>
-    </ol>
-
-    <h3>live-poll.js</h3>
-    <ol>
-      <li>Auto-detects the current live match</li>
-      <li>Every 10 minutes: fetches player points + each member's team → calculates live scores</li>
-      <li>Stores all snapshots in browser memory (no repeated downloads)</li>
-      <li>When you call <code>stopPolling()</code> or the match ends, downloads one JSON with all snapshots</li>
+      <li>Fetches the IPL match schedule to find all completed matches</li>
+      <li>For each league member: calls the <code>overall-get</code> API to get all match data in one shot</li>
+      <li>Detects booster usage (FREE_HIT, DOUBLE_POWER, etc.) and calculates bonus points</li>
+      <li>Builds cumulative rankings, transfer usage, and per-match breakdowns</li>
+      <li>Downloads one self-contained JSON file with everything</li>
     </ol>
 
     <h3>Dashboard</h3>
-    <p>Pure HTML + JavaScript (Chart.js). No server needed — just open the HTML file and load your JSON. Works offline.</p>
+    <p>Pure HTML + JavaScript — no server, no install. Hosted free on GitHub Pages. Auto-loads the latest JSON from the <code>master-snapshots/</code> folder.</p>
+    <p>Features: Standings, Prizes, Per-Match Leaderboard, Rank Progression, Points Race (bar + line animation), Rank Heatmap.</p>
   </div>
 
   <div style="text-align:center;padding:32px;color:var(--dim);font-size:13px;">

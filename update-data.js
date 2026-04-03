@@ -5,7 +5,7 @@
 // booster matches only. Calculates booster-attributed points.
 //
 // Downloads ONE file:
-//   ipl-fantasy-v3-master-gdN.json
+//   ipl-fantasy-v2-master-gdN.json
 //
 // HOW TO USE:
 //   1. Go to fantasy.iplt20.com and LOG IN
@@ -424,7 +424,7 @@
   const apiCalls = 2 + members.length + boosterGds.size;
   downloadJSON(output, `ipl-fantasy-v2-master-gd${latestGdId}.json`);
 
-  ok(`\n✅ Done! Downloaded: ipl-fantasy-v3-master-gd${latestGdId}.json`);
+  ok(`\n✅ Done! Downloaded: ipl-fantasy-v2-master-gd${latestGdId}.json`);
   ok(`   ${gamedayIds.length} matches, ${members.length} members, ${boosterMatches.length} booster usages`);
   ok(`   ${apiCalls} API calls (${boosterGds.size} extra for booster player data)`);
   ok(`   Save to v2/master-snapshots/ and refresh dashboard.`);

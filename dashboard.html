@@ -33,7 +33,7 @@
       margin-bottom: 4px;
     }
     header p { color: var(--text-dim); font-size: 14px; }
-    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .container { max-width: 1800px; margin: 0 auto; padding: 24px; }
 
     /* Upload Zone */
     .upload-zone {
@@ -445,42 +445,31 @@
       </div>
 
       <!-- Points Race: side-by-side bar race + line progression -->
-      <div class="chart-section" id="raceView" style="display:none;">
+      <div class="chart-section" id="raceView" style="display:none;max-width:none;">
         <h3>Cumulative Points Race</h3>
         <p class="subtitle">Bar race (left) shows live rankings · Line chart (right) traces point trajectories over time.</p>
-        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <!-- Unified controls -->
+        <div class="race-ctrls" style="margin-bottom:12px;">
+          <button id="racePlayBtn" onclick="toggleRace()">▶ Play</button>
+          <button onclick="raceStep(-1)">⏮</button>
+          <button onclick="raceStep(1)">⏭</button>
+          <input type="range" id="raceSlider" min="0" max="0" value="0" oninput="raceSeek(+this.value)" style="flex:1;min-width:100px;accent-color:var(--accent);" />
+          <span class="rlabel" id="raceLabel">—</span>
+          <select id="raceSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
+            <option value="3000">Slow</option>
+            <option value="1800" selected>Normal</option>
+            <option value="1000">Fast</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:32px;flex-wrap:wrap;width:100%;">
           <!-- Left: Bar Race -->
           <div style="flex:1;min-width:320px;">
             <div class="race-wrap">
-              <div class="race-ctrls">
-                <button id="racePlayBtn" onclick="toggleRace()">▶ Play</button>
-                <button onclick="raceStep(-1)">⏮</button>
-                <button onclick="raceStep(1)">⏭</button>
-                <input type="range" id="raceSlider" min="0" max="0" value="0" oninput="raceSeek(+this.value)" style="flex:1;min-width:60px;accent-color:var(--accent);" />
-                <span class="rlabel" id="raceLabel">—</span>
-                <select id="raceSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
-                  <option value="3000">Slow</option>
-                  <option value="1800" selected>Normal</option>
-                  <option value="1000">Fast</option>
-                </select>
-              </div>
               <div id="raceBars"></div>
             </div>
           </div>
           <!-- Right: Line Progression -->
           <div style="flex:1;min-width:320px;">
-            <div class="race-ctrls" id="ptsAnimCtrls" style="margin-bottom:8px;">
-              <button onclick="ptsAnimToggle()">▶ Play</button>
-              <button onclick="ptsAnimStep(-1)">⏮</button>
-              <button onclick="ptsAnimStep(1)">⏭</button>
-              <input type="range" id="ptsAnimSlider" min="0" max="1000" value="1000" oninput="ptsAnimSeek(+this.value)" style="flex:1;min-width:60px;accent-color:var(--accent);" />
-              <span class="rlabel" id="ptsAnimLabel" style="min-width:80px;">—</span>
-              <select id="ptsAnimSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
-                <option value="3000">Slow</option>
-                <option value="1800" selected>Normal</option>
-                <option value="1000">Fast</option>
-              </select>
-            </div>
             <div style="position:relative;height:500px;background:var(--surface);border-radius:8px;overflow:hidden;">
               <canvas id="ptsAnimCanvas" style="width:100%;height:100%;"></canvas>
             </div>
@@ -892,8 +881,6 @@
       document.getElementById('ptsAnimLegend').innerHTML = legHtml;
 
       ptsAnimDraw(1);
-      document.getElementById('ptsAnimSlider').value = 1000;
-      ptsAnimUpdateLabel(1);
     }
 
     function ptsAnimDraw(progress) {
@@ -910,7 +897,7 @@
       const total = labels.length;
       if (total === 0) return;
 
-      const pad = { top: 30, bottom: 40, left: 60, right: 140 };
+      const pad = { top: 30, bottom: 40, left: 60, right: 200 };
       const plotW = W - pad.left - pad.right;
       const plotH = H - pad.top - pad.bottom;
 
@@ -1039,62 +1026,11 @@
       }
     }
 
-    function ptsAnimUpdateLabel(progress) {
-      const { labels, matchDetails } = ptsAnim;
-      const total = labels.length;
-      const matchIdx = Math.min(Math.ceil(progress * (total - 1)), total - 1);
-      const md = matchDetails[matchIdx];
-      document.getElementById('ptsAnimLabel').textContent = md ? `M${md.gamedayId}: ${md.name}` : '—';
-    }
-
-    function ptsAnimToggle() {
-      if (ptsAnim.playing) {
-        ptsAnimStop();
-      } else {
-        ptsAnim.playing = true;
-        document.querySelector('#ptsAnimCtrls button').textContent = '⏸ Pause';
-        if (ptsAnim.progress >= 0.99) ptsAnim.progress = 0;
-        const speedMs = parseInt(document.getElementById('ptsAnimSpeed').value) || 1800;
-        const totalDuration = speedMs * ptsAnim.labels.length;
-        ptsAnim.startTime = performance.now() - (ptsAnim.progress * totalDuration);
-
-        function frame(now) {
-          if (!ptsAnim.playing) return;
-          const speedMs = parseInt(document.getElementById('ptsAnimSpeed').value) || 1800;
-          const totalDuration = speedMs * ptsAnim.labels.length;
-          const p = Math.min((now - ptsAnim.startTime) / totalDuration, 1);
-          ptsAnim.progress = p;
-          ptsAnimDraw(p);
-          document.getElementById('ptsAnimSlider').value = Math.round(p * 1000);
-          ptsAnimUpdateLabel(p);
-          if (p < 1) ptsAnim.rafId = requestAnimationFrame(frame);
-          else ptsAnimStop();
-        }
-        ptsAnim.rafId = requestAnimationFrame(frame);
-      }
-    }
-
-    function ptsAnimStop() {
-      ptsAnim.playing = false;
-      if (ptsAnim.rafId) cancelAnimationFrame(ptsAnim.rafId);
-      ptsAnim.rafId = null;
-      document.querySelector('#ptsAnimCtrls button').textContent = '▶ Play';
-    }
-
-    function ptsAnimStep(dir) {
-      ptsAnimStop();
-      const step = 1 / (ptsAnim.labels.length - 1 || 1);
-      ptsAnim.progress = Math.max(0, Math.min(1, ptsAnim.progress + dir * step));
+    // Line chart sync — called by race controls, no separate controls needed
+    function ptsAnimSyncTo(matchIdx, total) {
+      if (!ptsAnim.labels.length) return;
+      ptsAnim.progress = matchIdx / (total - 1 || 1);
       ptsAnimDraw(ptsAnim.progress);
-      document.getElementById('ptsAnimSlider').value = Math.round(ptsAnim.progress * 1000);
-      ptsAnimUpdateLabel(ptsAnim.progress);
-    }
-
-    function ptsAnimSeek(val) {
-      ptsAnimStop();
-      ptsAnim.progress = val / 1000;
-      ptsAnimDraw(ptsAnim.progress);
-      ptsAnimUpdateLabel(ptsAnim.progress);
     }
 
     // ---- Per-Match Leaderboard ----
@@ -1210,8 +1146,8 @@
       document.getElementById('matchLbView').style.display = view === 'matchLb' ? '' : 'none';
       document.getElementById('heatmapView').style.display = view === 'heatmap' ? '' : 'none';
       document.getElementById('raceView').style.display = view === 'race' ? '' : 'none';
-      if (view === 'race') stopRace();
-      if (view !== 'race') ptsAnimStop();
+      if (view === 'race') { stopRace(); ptsAnimDraw(ptsAnim.progress); }
+      if (view !== 'race') stopRace();
     }
 
     // ---- Standings Table ----
@@ -1433,17 +1369,17 @@
       });
 
       raceData = { snapshots, matchDetails, gamedays };
-      raceIdx = 0;
+      raceIdx = snapshots.length - 1;
 
       const slider = document.getElementById('raceSlider');
       slider.max = snapshots.length - 1;
-      slider.value = 0;
+      slider.value = snapshots.length - 1;
 
       // Set container height
       document.getElementById('raceBars').style.height = (members.length * ROW_H) + 'px';
       // Clear so first render builds DOM
       document.getElementById('raceBars').innerHTML = '';
-      renderRaceFrame(0);
+      renderRaceFrame(snapshots.length - 1);
     }
 
     function renderRaceFrame(idx) {
@@ -1451,6 +1387,11 @@
       const snap = raceData.snapshots[idx];
       const md = raceData.matchDetails[idx];
       const maxPts = Math.max(...snap.map(e => e.pts), 1);
+      const minPts = Math.min(...snap.map(e => e.pts));
+      // Truncated scale: use 80% of min as the floor, 110% of max as ceiling
+      const floor = Math.max(0, Math.floor(minPts * 0.8));
+      const ceiling = Math.ceil(maxPts * 1.1);
+      const range = ceiling - floor || 1;
 
       document.getElementById('raceLabel').textContent =
         `Match ${md.gamedayId}: ${md.name} (${md.date})`;
@@ -1461,7 +1402,7 @@
       if (container.children.length === 0) {
         let html = '';
         snap.forEach((entry, pos) => {
-          const w = Math.max(Math.round((entry.pts / maxPts) * 100), 1);
+          const w = Math.max(Math.round(((entry.pts - floor) / range) * 100), 2);
           html += `<div class="race-row" data-name="${entry.name}" style="top:${pos * ROW_H}px">
             <div class="race-name" style="color:${entry.color}">${entry.name}</div>
             <div class="race-bar" style="width:${w}%;background:${entry.color};">${entry.pts}</div>
@@ -1475,7 +1416,7 @@
           if (!row) return;
           row.style.top = (pos * ROW_H) + 'px';
           const bar = row.querySelector('.race-bar');
-          const w = Math.max(Math.round((entry.pts / maxPts) * 100), 1);
+          const w = Math.max(Math.round(((entry.pts - floor) / range) * 100), 2);
           bar.style.width = w + '%';
           bar.textContent = entry.pts;
           const gdEl = row.querySelector('span:last-child');
@@ -1488,21 +1429,48 @@
       if (raceTimer) { stopRace(); return; }
       const btn = document.getElementById('racePlayBtn');
       btn.textContent = '⏸ Pause';
-      if (raceIdx >= raceData.snapshots.length - 1) raceIdx = -1;
+      if (raceIdx >= raceData.snapshots.length - 1) {
+        raceIdx = 0;
+        renderRaceFrame(0);
+        ptsAnimSyncTo(0, raceData.snapshots.length);
+      }
       advanceRace();
     }
 
     function advanceRace() {
       if (!raceData) return;
-      raceIdx++;
-      if (raceIdx >= raceData.snapshots.length) { stopRace(); return; }
-      renderRaceFrame(raceIdx);
+      const fromIdx = raceIdx;
+      const toIdx = fromIdx + 1;
+      if (toIdx >= raceData.snapshots.length) { stopRace(); return; }
+
       const speed = parseInt(document.getElementById('raceSpeed').value) || 800;
-      raceTimer = setTimeout(advanceRace, speed);
+      const total = raceData.snapshots.length;
+      const startTime = performance.now();
+
+      function frame(now) {
+        if (!raceTimer) return;
+        const t = Math.min((now - startTime) / speed, 1);
+
+        // Lerp line chart smoothly
+        const fromP = fromIdx / (total - 1 || 1);
+        const toP = toIdx / (total - 1 || 1);
+        ptsAnim.progress = fromP + (toP - fromP) * t;
+        ptsAnimDraw(ptsAnim.progress);
+
+        if (t >= 1) {
+          // Step complete — update bar chart and move to next
+          raceIdx = toIdx;
+          renderRaceFrame(raceIdx);
+          advanceRace();
+        } else {
+          raceTimer = requestAnimationFrame(frame);
+        }
+      }
+      raceTimer = requestAnimationFrame(frame);
     }
 
     function stopRace() {
-      clearTimeout(raceTimer);
+      if (raceTimer) cancelAnimationFrame(raceTimer);
       raceTimer = null;
       const btn = document.getElementById('racePlayBtn');
       if (btn) btn.textContent = '▶ Play';
@@ -1513,12 +1481,14 @@
       if (!raceData) return;
       raceIdx = Math.max(0, Math.min(raceData.snapshots.length - 1, raceIdx + dir));
       renderRaceFrame(raceIdx);
+      ptsAnimSyncTo(raceIdx, raceData.snapshots.length);
     }
 
     function raceSeek(val) {
       stopRace();
       raceIdx = parseInt(val);
       renderRaceFrame(raceIdx);
+      ptsAnimSyncTo(raceIdx, raceData.snapshots.length);
     }
   </script>
 </body>
