@@ -1,0 +1,14 @@
+# v1 is legacy, not needed for public dashboard
+v1/
+
+# Local-only files
+start-dashboard.bat
+HANDOFF.md
+
+# Browser console scripts (contain API details, not for public)
+v2/update-data.js
+v2/update-data-v3.js
+
+# OS files
+Thumbs.db
+.DS_Store

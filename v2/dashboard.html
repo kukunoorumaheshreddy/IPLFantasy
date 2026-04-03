@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPL Fantasy League — Ranking Dashboard v5</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d28;
+      --border: #2a2d3a;
+      --text: #e1e4ec;
+      --text-dim: #8b8fa3;
+      --accent: #6c5ce7;
+      --accent-light: #a29bfe;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #1a1d28 0%, #2d1b69 100%);
+      padding: 24px 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    header p { color: var(--text-dim); font-size: 14px; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* Upload Zone */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 48px;
+      text-align: center;
+      margin-bottom: 24px;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(108, 92, 231, 0.05);
+    }
+    .upload-zone h2 { font-size: 20px; margin-bottom: 8px; }
+    .upload-zone p { color: var(--text-dim); margin-bottom: 16px; }
+    .upload-zone input[type="file"] { display: none; }
+    .btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #5a4bd1; }
+
+    /* Instructions */
+    .instructions {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .instructions h3 { font-size: 16px; margin-bottom: 12px; color: var(--accent-light); }
+    .instructions ol { padding-left: 20px; line-height: 1.8; color: var(--text-dim); }
+    .instructions code {
+      background: #2a2d3a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    /* Dashboard */
+    .dashboard { display: none; }
+    .dashboard.visible { display: block; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .stat-card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+
+    .chart-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .chart-section h3 {
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    .chart-section .subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+    .chart-wrapper { position: relative; width: 100%; }
+    .chart-wrapper.rank-chart { height: 700px; }
+    .chart-wrapper.points-chart { height: 500px; }
+
+    /* Heatmap */
+    .heatmap-scroll { overflow-x: auto; margin-top: 16px; }
+    .heatmap-table { border-collapse: collapse; font-size: 13px; width: 100%; }
+    .heatmap-table th, .heatmap-table td { padding: 6px 10px; text-align: center; white-space: nowrap; border: 1px solid var(--border); }
+    .heatmap-table th { background: var(--bg); color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .heatmap-table td.hm-team { text-align: left; font-weight: 600; background: var(--surface); position: sticky; left: 0; z-index: 1; min-width: 150px; border-right: 2px solid var(--border); }
+    .heatmap-table th:first-child { position: sticky; left: 0; z-index: 2; background: var(--bg); }
+    .hm-cell { font-weight: 700; font-size: 13px; min-width: 42px; }
+
+    /* Bar Chart Race */
+    .race-wrap { margin-top: 16px; }
+    .race-ctrls { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .race-ctrls button {
+      padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-size: 14px; cursor: pointer; transition: all 0.15s;
+    }
+    .race-ctrls button:hover { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .race-ctrls .rlabel { color: var(--text-dim); font-size: 14px; font-weight: 600; }
+    #raceBars { position: relative; }
+    .race-row { display: flex; align-items: center; gap: 8px; height: 34px; position: absolute; left: 0; right: 0; transition: top 0.5s ease-in-out; }
+    .race-name { min-width: 150px; font-size: 13px; font-weight: 600; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .race-bar { height: 28px; border-radius: 5px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 12px; font-weight: 700; color: #fff; min-width: 2px; transition: width 0.5s ease-out; }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .controls label {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-right: 4px;
+    }
+    .toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .toggle-btn .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .select-all-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent-light);
+      font-size: 13px;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    .select-all-btn:hover { background: rgba(108, 92, 231, 0.1); }
+
+    /* Table */
+    .table-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid var(--border);
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(108, 92, 231, 0.05); }
+    .rank-change { font-size: 12px; font-weight: 600; }
+    .rank-up { color: #00b894; }
+    .rank-down { color: #e17055; }
+    .rank-same { color: var(--text-dim); }
+    .highlight-row td { background: rgba(108, 92, 231, 0.08); }
+
+    /* View toggle */
+    .view-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 4px;
+      margin-bottom: 16px;
+      width: fit-content;
+    }
+    .view-tab {
+      padding: 8px 20px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .view-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🏏 IPL Fantasy League — Ranking Dashboard</h1>
+    <p>Track how each team's ranking progresses through the tournament</p>
+  </header>
+
+  <div class="container">
+    <!-- Loading indicator -->
+    <div id="autoLoadStatus" style="display:none;">
+      <div class="instructions">
+        <h3>⏳ Auto-loading latest data...</h3>
+        <p id="autoLoadMsg" style="color:var(--text-dim);">Searching for snapshot files...</p>
+      </div>
+    </div>
+
+    <!-- Upload Section -->
+    <div id="uploadSection">
+      <div class="instructions">
+        <h3>📋 How to get your league data</h3>
+        <ol>
+          <li>Go to <a href="https://fantasy.iplt20.com/classic/home" target="_blank" style="color: var(--accent-light);">fantasy.iplt20.com</a> and <strong>log in</strong></li>
+          <li>Open browser DevTools: press <code>F12</code> → go to the <strong>Console</strong> tab</li>
+          <li>Copy the contents of <code>update-data.js</code> (in the same folder as this file) and paste into the console</li>
+          <li>Press <code>Enter</code> and wait — a JSON file will download automatically</li>
+          <li>Move it to the <code>master-snapshots/</code> folder, then refresh this page</li>
+        </ol>
+      </div>
+
+      <div class="upload-zone" id="dropZone">
+        <h2>📂 Load League Data</h2>
+        <p>Drag &amp; drop your JSON file here, or click to browse</p>
+        <button class="btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
+        <input type="file" id="fileInput" accept=".json" />
+      </div>
+
+      <div class="instructions" style="margin-top:16px;">
+        <h3>💡 Or paste JSON data directly</h3>
+        <textarea id="jsonPaste" rows="6" style="width:100%;background:#2a2d3a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;resize:vertical;" placeholder="Paste your JSON data here..."></textarea>
+        <button class="btn" style="margin-top:12px;" onclick="loadFromPaste()">Load Pasted Data</button>
+      </div>
+    </div>
+
+    <!-- Dashboard (hidden until data loaded) -->
+    <div class="dashboard" id="dashboard">
+      <!-- Snapshot switcher -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+        <span style="color:var(--text-dim);font-size:14px;">📄 Loaded:</span>
+        <strong id="loadedFile" style="font-size:14px;color:var(--accent-light);">—</strong>
+        <button class="btn" style="padding:6px 16px;font-size:13px;" onclick="document.getElementById('switchFileInput').click()">Load Different Snapshot</button>
+        <input type="file" id="switchFileInput" accept=".json" style="display:none;" />
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row" id="statsRow"></div>
+
+      <!-- View Tabs -->
+      <div class="view-tabs">
+        <button class="view-tab active" data-view="table" onclick="switchView('table')">Standings</button>
+        <button class="view-tab" data-view="prizes" onclick="switchView('prizes')">Prizes</button>
+        <button class="view-tab" data-view="matchLb" onclick="switchView('matchLb')">Per-Match Leaderboard</button>
+        <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
+        <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
+        <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
+        <button class="view-tab" data-view="points" onclick="switchView('points')">Points Progression</button>
+      </div>
+
+      <!-- Rank Chart -->
+      <div class="chart-section" id="rankView" style="display:none;">
+        <h3>League Rank Progression</h3>
+        <p class="subtitle">Lower rank = better position. Hover over lines to see details.</p>
+        <div class="controls" id="rankControls"></div>
+        <div class="chart-wrapper rank-chart">
+          <canvas id="rankChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Points Chart -->
+      <div class="chart-section" id="pointsView" style="display:none;">
+        <h3>Cumulative Points Progression</h3>
+        <p class="subtitle">Total fantasy points accumulated over the tournament</p>
+        <div class="controls" id="pointsControls"></div>
+        <div class="chart-wrapper points-chart">
+          <canvas id="pointsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Gameday Points Chart -->
+      <div class="chart-section" id="gdPointsView" style="display:none;">
+        <h3>Points Per Gameday</h3>
+        <p class="subtitle">Fantasy points scored in each individual match</p>
+        <div class="chart-wrapper points-chart">
+          <canvas id="gdPointsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Table View -->
+      <div class="table-section" id="tableView">
+        <h3 id="standingsHeading" style="margin-bottom:4px;">Current Standings</h3>
+        <div id="standingsTable"></div>
+      </div>
+
+      <!-- Prizes -->
+      <div class="table-section" id="prizesView" style="display:none;">
+        <h3 id="prizesHeading">Prize Contenders</h3>
+        <div id="prizesContent"></div>
+      </div>
+
+      <!-- Per-Match Leaderboard -->
+      <div id="matchLbView" style="display:none;">
+        <div class="table-section">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+            <h3 style="margin:0;">Per-Match Leaderboard</h3>
+            <select id="matchSelect" onchange="showSelectedMatch()" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;min-width:220px;">
+            </select>
+          </div>
+          <div id="matchLeaderboards"></div>
+        </div>
+      </div>
+
+      <!-- Rank Heatmap -->
+      <div class="chart-section" id="heatmapView" style="display:none;">
+        <h3>Rank Heatmap</h3>
+        <p class="subtitle">Green = top rank, Red = bottom rank. Each cell shows the league rank after that match.</p>
+        <div class="heatmap-scroll" id="heatmapContainer"></div>
+      </div>
+
+      <!-- Bar Chart Race -->
+      <div class="chart-section" id="raceView" style="display:none;">
+        <h3>Cumulative Points Race</h3>
+        <p class="subtitle">Watch teams accumulate points match by match. Bars auto-sort by total.</p>
+        <div class="race-wrap">
+          <div class="race-ctrls">
+            <button id="racePlayBtn" onclick="toggleRace()">▶ Play</button>
+            <button onclick="raceStep(-1)">⏮</button>
+            <button onclick="raceStep(1)">⏭</button>
+            <input type="range" id="raceSlider" min="0" max="0" value="0" oninput="raceSeek(+this.value)" style="flex:1;min-width:100px;accent-color:var(--accent);" />
+            <span class="rlabel" id="raceLabel">—</span>
+            <select id="raceSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
+              <option value="1500">Slow</option>
+              <option value="800" selected>Normal</option>
+              <option value="400">Fast</option>
+            </select>
+          </div>
+          <div id="raceBars"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- Color palette ----
+    const COLORS = [
+      '#6c5ce7','#00b894','#e17055','#0984e3','#fdcb6e','#e84393',
+      '#00cec9','#d63031','#a29bfe','#55efc4','#fab1a0','#74b9ff',
+      '#ffeaa7','#fd79a8','#81ecec','#ff7675','#636e72','#dfe6e9',
+      '#b2bec3','#2d3436','#f8a5c2','#778beb','#cf6a87','#786fa6',
+      '#f19066','#f5cd79','#546de5','#e15f41','#c44569','#574b90',
+    ];
+
+    const BOOSTER_NAMES = {
+      11: '🎯 Free Hit',
+      // IDs below are placeholders — update when discovered
+      1: '⚡ Double Power',
+      2: '🌍 Foreign Stars',
+      3: '🇮🇳 Indian Warriors',
+      4: '👑 Triple Captain',
+      5: '🃏 Wild Card',
+    };
+    function boosterLabel(id) {
+      if (!id) return null;
+      return BOOSTER_NAMES[id] || `🔮 Booster #${id}`;
+    }
+
+    let rawData = null;
+    let rankChart = null;
+    let pointsChart = null;
+    let gdPointsChart = null;
+    let visibleTeams = new Set();
+
+    // ---- File loading ----
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) readFile(file);
+    });
+    fileInput.addEventListener('change', (e) => { if (e.target.files[0]) readFile(e.target.files[0]); });
+
+    let currentFileName = '';
+
+    function readFile(file) {
+      currentFileName = file.name;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          processData(data);
+        } catch (err) {
+          alert('Error parsing JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function loadFromPaste() {
+      const text = document.getElementById('jsonPaste').value.trim();
+      if (!text) return alert('Please paste JSON data first.');
+      try {
+        currentFileName = 'pasted data';
+        const data = JSON.parse(text);
+        processData(data);
+      } catch (err) {
+        alert('Error parsing JSON: ' + err.message);
+      }
+    }
+
+    // ---- Auto-load: try master-snapshots/ipl-fantasy-v2-master-gdN.json from high to low ----
+    (async function autoLoad() {
+      const statusEl = document.getElementById('autoLoadStatus');
+      const msgEl = document.getElementById('autoLoadMsg');
+      statusEl.style.display = '';
+
+      // Try gd70 down to gd1 (IPL has max 70 matches)
+      for (let gd = 70; gd >= 1; gd--) {
+        const filename = `master-snapshots/ipl-fantasy-v2-master-gd${gd}.json`;
+        try {
+          msgEl.textContent = `Trying ${filename}...`;
+          const res = await fetch(filename);
+          if (!res.ok) continue;
+          const text = await res.text();
+          const data = JSON.parse(text);
+          if (data && data.gamedays && data.gamedays.length > 0) {
+            currentFileName = `ipl-fantasy-v2-master-gd${gd}.json`;
+            statusEl.style.display = 'none';
+            processData(data);
+            console.log(`[Dashboard] Auto-loaded ${currentFileName} (${data.gamedays.length} matches)`);
+            return;
+          }
+        } catch { continue; }
+      }
+
+      // Nothing found — show manual upload
+      statusEl.style.display = 'none';
+      console.log('[Dashboard] No snapshot files found in master-snapshots/. Showing manual upload.');
+    })();
+
+    // ---- Switch file handler ----
+    document.getElementById('switchFileInput').addEventListener('change', (e) => {
+      if (e.target.files[0]) readFile(e.target.files[0]);
+    });
+
+    // ---- Data processing ----
+    function processData(data) {
+      rawData = data;
+      document.getElementById('uploadSection').style.display = 'none';
+      document.getElementById('autoLoadStatus').style.display = 'none';
+      document.getElementById('dashboard').classList.add('visible');
+      document.getElementById('loadedFile').textContent = currentFileName + ` (${data.gamedays?.length || 0} matches)`;
+
+      // Build per-member progression
+      const gamedays = data.gamedays.sort((a, b) => a.gamedayId - b.gamedayId);
+      const memberMap = {}; // teamName -> { ranks:[], points:[], gdPoints:[], boosters:[], subsUsed:null, subsTotal:null }
+
+      gamedays.forEach((gd, idx) => {
+        const sorted = [...gd.leaderboard].sort((a, b) => {
+          const rA = a.rank || a.leagueRank || 999;
+          const rB = b.rank || b.leagueRank || 999;
+          return rA - rB;
+        });
+
+        sorted.forEach((entry, pos) => {
+          const name = entry.teamName || entry.temname;
+          if (!memberMap[name]) {
+            memberMap[name] = { ranks: [], points: [], gdPoints: [], boosters: [], userId: entry.userId || entry.usrscoid };
+          }
+          const rank = entry.rank || entry.leagueRank || (pos + 1);
+          const pts = entry.totalPoints || entry.points || 0;
+          memberMap[name].ranks.push(rank);
+          memberMap[name].points.push(pts);
+          // Use gamedayPoints if available (v2), otherwise compute as diff
+          if (entry.gamedayPoints != null) {
+            memberMap[name].gdPoints.push(entry.gamedayPoints);
+          } else {
+            const prevPts = memberMap[name].points.length > 1 ? memberMap[name].points[memberMap[name].points.length - 2] : 0;
+            memberMap[name].gdPoints.push(Math.round((pts - prevPts) * 100) / 100);
+          }
+          memberMap[name].boosters.push(entry.boosterId || null);
+          // Track latest substitution data (cumulative, so last value wins)
+          if (entry.subsUsed != null) memberMap[name].subsUsed = entry.subsUsed;
+          if (entry.subsLeft != null) memberMap[name].subsLeft = entry.subsLeft;
+          if (entry.subsTotal != null) memberMap[name].subsTotal = entry.subsTotal;
+          // Track per-match subs
+          if (!memberMap[name].subsPerMatch) memberMap[name].subsPerMatch = [];
+          memberMap[name].subsPerMatch.push(entry.subsThisMatch ?? null);
+        });
+
+        Object.keys(memberMap).forEach((name) => {
+          if (memberMap[name].ranks.length <= idx) {
+            memberMap[name].ranks.push(null);
+            memberMap[name].points.push(null);
+            memberMap[name].gdPoints.push(null);
+            memberMap[name].boosters.push(null);
+          }
+        });
+      });
+
+      // Labels (x-axis) — show match number, keep match details for tooltips
+      const labels = gamedays.map((gd) => `M${gd.gamedayId}`);
+      const matchDetails = gamedays.map((gd) => {
+        const name = gd.matchName || `Match ${gd.gamedayId}`;
+        const date = gd.matchDate || '';
+        return { name, date, gamedayId: gd.gamedayId };
+      });
+
+      // Sort members by latest rank
+      const members = Object.entries(memberMap).sort((a, b) => {
+        const lastA = a[1].ranks.filter((r) => r != null).pop() || 999;
+        const lastB = b[1].ranks.filter((r) => r != null).pop() || 999;
+        return lastA - lastB;
+      });
+
+      // Initialize all as visible
+      visibleTeams = new Set(members.map(([name]) => name));
+
+      // Stats
+      renderStats(gamedays, members);
+
+      // Controls (team toggles)
+      renderControls(members, 'rankControls');
+      renderControls(members, 'pointsControls');
+
+      // Charts
+      renderRankChart(labels, members, matchDetails);
+      renderPointsChart(labels, members, matchDetails);
+      renderGdPointsChart(labels, members, matchDetails);
+
+      // Tables
+      renderTable(gamedays, members);
+      renderPrizes(gamedays, members, data);
+      renderMatchLeaderboard(gamedays, members);
+
+      // New visualizations
+      renderHeatmap(labels, gamedays, members, matchDetails);
+      initRace(gamedays, members, matchDetails);
+    }
+
+    function renderStats(gamedays, members) {
+      const lastGd = gamedays[gamedays.length - 1];
+      const html = `
+        <div class="stat-card"><div class="label">Members</div><div class="value">${members.length}</div></div>
+        <div class="stat-card"><div class="label">Matches Played</div><div class="value">${gamedays.length}</div></div>
+        <div class="stat-card"><div class="label">Leader</div><div class="value" style="font-size:18px;">${members[0]?.[0] || '—'}</div></div>
+        <div class="stat-card"><div class="label">Top Points</div><div class="value">${members[0]?.[1].points.filter(p=>p!=null).pop() || '—'}</div></div>
+      `;
+      document.getElementById('statsRow').innerHTML = html;
+    }
+
+    function renderControls(members, containerId) {
+      const container = document.getElementById(containerId);
+      let html = '<label>Teams:</label>';
+      members.forEach(([name], i) => {
+        const color = COLORS[i % COLORS.length];
+        html += `<button class="toggle-btn active" data-team="${name}" onclick="toggleTeam('${name.replace(/'/g, "\\'")}')" style="border-color:${color}">
+          <span class="dot" style="background:${color}"></span>${name}
+        </button>`;
+      });
+      html += `<button class="select-all-btn" onclick="toggleAll()">Toggle All</button>`;
+      container.innerHTML = html;
+    }
+
+    function toggleTeam(name) {
+      if (visibleTeams.has(name)) visibleTeams.delete(name);
+      else visibleTeams.add(name);
+      updateToggleButtons();
+      updateChartVisibility();
+    }
+
+    function toggleAll() {
+      if (visibleTeams.size > 0) visibleTeams.clear();
+      else rawData && processData(rawData); // Re-show all
+      updateToggleButtons();
+      updateChartVisibility();
+    }
+
+    function updateToggleButtons() {
+      document.querySelectorAll('.toggle-btn').forEach((btn) => {
+        const name = btn.dataset.team;
+        btn.classList.toggle('active', visibleTeams.has(name));
+      });
+    }
+
+    function updateChartVisibility() {
+      [rankChart, pointsChart, gdPointsChart].forEach((chart) => {
+        if (!chart) return;
+        chart.data.datasets.forEach((ds) => {
+          ds.hidden = !visibleTeams.has(ds.label);
+        });
+        chart.update('none');
+      });
+    }
+
+    // ---- Rank Chart (improved bump chart) ----
+    function renderRankChart(labels, members, matchDetails) {
+      const ctx = document.getElementById('rankChart').getContext('2d');
+      if (rankChart) rankChart.destroy();
+
+      const numMembers = members.length;
+
+      // Custom plugin: draw team names at start & end of each line
+      const bumpLabelPlugin = {
+        id: 'bumpLabels',
+        afterDatasetsDraw(chart) {
+          const c = chart.ctx;
+          chart.data.datasets.forEach((ds, i) => {
+            if (ds.hidden) return;
+            const meta = chart.getDatasetMeta(i);
+            if (!meta.visible) return;
+            const pts = meta.data.filter(p => p && !isNaN(p.y));
+            if (pts.length === 0) return;
+            const first = pts[0], last = pts[pts.length - 1];
+            c.save();
+            c.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
+            c.textBaseline = 'middle';
+            c.fillStyle = ds.borderColor;
+            c.textAlign = 'right';
+            c.fillText(ds.label, first.x - 14, first.y);
+            c.textAlign = 'left';
+            c.fillText(ds.label, last.x + 14, last.y);
+            c.restore();
+          });
+        }
+      };
+
+      const datasets = members.map(([name, data], i) => ({
+        label: name,
+        data: data.ranks,
+        borderColor: COLORS[i % COLORS.length],
+        backgroundColor: COLORS[i % COLORS.length] + '33',
+        borderWidth: 3.5,
+        pointRadius: 7,
+        pointHoverRadius: 11,
+        pointBackgroundColor: COLORS[i % COLORS.length],
+        pointBorderColor: '#1a1d28',
+        pointBorderWidth: 2,
+        tension: 0.35,
+        spanGaps: true,
+        hidden: !visibleTeams.has(name),
+      }));
+
+      rankChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        plugins: [bumpLabelPlugin],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+          layout: { padding: { top: 20, bottom: 20, left: 150, right: 150 } },
+          onHover: (evt, elems, chart) => {
+            const hIdx = elems.length > 0 ? elems[0].datasetIndex : null;
+            chart.data.datasets.forEach((ds, i) => {
+              if (ds.hidden) return;
+              const base = COLORS[i % COLORS.length];
+              if (hIdx === null) {
+                ds.borderWidth = 3.5; ds.pointRadius = 7;
+                ds.borderColor = base; ds.pointBackgroundColor = base;
+              } else if (i === hIdx) {
+                ds.borderWidth = 5; ds.pointRadius = 9;
+                ds.borderColor = base; ds.pointBackgroundColor = base;
+              } else {
+                ds.borderWidth = 1.5; ds.pointRadius = 3;
+                ds.borderColor = base + '30'; ds.pointBackgroundColor = base + '30';
+              }
+            });
+            chart.update('none');
+          },
+          scales: {
+            y: {
+              reverse: true,
+              title: { display: false },
+              ticks: { color: '#8b8fa3', stepSize: 1, font: { size: 13 }, callback: v => Number.isInteger(v) ? v : '' },
+              grid: { color: '#2a2d3a' },
+              min: 0.5, max: numMembers + 0.5,
+            },
+            x: {
+              ticks: { color: '#8b8fa3', maxRotation: 0, font: { size: 13, weight: 'bold' } },
+              grid: { color: '#2a2d3a22' },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1a1d28ee', borderColor: '#2a2d3a', borderWidth: 1,
+              titleFont: { size: 14 }, bodyFont: { size: 13 }, padding: 12,
+              callbacks: {
+                title: (items) => { const md = matchDetails[items[0]?.dataIndex]; return md ? `Match ${md.gamedayId}: ${md.name} (${md.date})` : items[0]?.label; },
+                label: (ctx) => `  ${ctx.dataset.label}: Rank #${ctx.parsed.y}`,
+              },
+            },
+          },
+        },
+      });
+
+      // Reset all lines when mouse leaves the chart canvas
+      rankChart.canvas.addEventListener('mouseleave', () => {
+        rankChart.data.datasets.forEach((ds, i) => {
+          if (ds.hidden) return;
+          const base = COLORS[i % COLORS.length];
+          ds.borderWidth = 3.5; ds.pointRadius = 7;
+          ds.borderColor = base; ds.pointBackgroundColor = base;
+        });
+        rankChart.update('none');
+      });
+    }
+    function renderPointsChart(labels, members, matchDetails) {
+      const ctx = document.getElementById('pointsChart').getContext('2d');
+      if (pointsChart) pointsChart.destroy();
+
+      const datasets = members.map(([name, data], i) => ({
+        label: name,
+        data: data.points,
+        borderColor: COLORS[i % COLORS.length],
+        backgroundColor: COLORS[i % COLORS.length] + '22',
+        borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 8,
+        pointBackgroundColor: COLORS[i % COLORS.length],
+        pointBorderColor: '#1a1d28', pointBorderWidth: 1.5,
+        tension: 0.3, spanGaps: true, fill: false,
+        hidden: !visibleTeams.has(name),
+      }));
+
+      pointsChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          layout: { padding: { top: 10, right: 10 } },
+          scales: {
+            y: { title: { display: true, text: 'Total Points', color: '#8b8fa3', font: { size: 14 } }, ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' }, beginAtZero: true },
+            x: { ticks: { color: '#8b8fa3', maxRotation: 0, font: { size: 13, weight: 'bold' } }, grid: { color: '#2a2d3a22' } },
+          },
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { color: '#e1e4ec', font: { size: 13 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } },
+            tooltip: {
+              backgroundColor: '#1a1d28ee', borderColor: '#2a2d3a', borderWidth: 1,
+              callbacks: {
+                title: (items) => { const md = matchDetails[items[0]?.dataIndex]; return md ? `Match ${md.gamedayId}: ${md.name} (${md.date})` : items[0]?.label; },
+                label: (ctx) => `  ${ctx.dataset.label}: ${ctx.parsed.y} pts`,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // ---- Gameday Points Bar Chart ----
+    function renderGdPointsChart(labels, members, matchDetails) {
+      const ctx = document.getElementById('gdPointsChart').getContext('2d');
+      if (gdPointsChart) gdPointsChart.destroy();
+
+      const datasets = members.map(([name, data], i) => ({
+        label: name,
+        data: data.gdPoints,
+        backgroundColor: COLORS[i % COLORS.length] + 'aa',
+        borderColor: COLORS[i % COLORS.length],
+        borderWidth: 1,
+        hidden: !visibleTeams.has(name),
+      }));
+
+      gdPointsChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: { title: { display: true, text: 'Match Points', color: '#8b8fa3' }, ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } },
+            x: { ticks: { color: '#8b8fa3', maxRotation: 0, font: { size: 13, weight: 'bold' } }, grid: { color: '#2a2d3a22' } },
+          },
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { color: '#e1e4ec', font: { size: 12 }, padding: 12, usePointStyle: true, pointStyle: 'rectRounded' } },
+            tooltip: {
+              backgroundColor: '#1a1d28ee', borderColor: '#2a2d3a', borderWidth: 1,
+              callbacks: {
+                title: (items) => { const md = matchDetails[items[0]?.dataIndex]; return md ? `Match ${md.gamedayId}: ${md.name} (${md.date})` : items[0]?.label; },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // ---- Per-Match Leaderboard ----
+    let matchLbData = null; // stored for dropdown re-render
+
+    function renderMatchLeaderboard(gamedays, members) {
+      const memberColorMap = {};
+      members.forEach(([name], i) => { memberColorMap[name] = COLORS[i % COLORS.length]; });
+      matchLbData = { gamedays, memberColorMap };
+
+      // Populate dropdown (latest match first)
+      const sel = document.getElementById('matchSelect');
+      sel.innerHTML = '';
+      [...gamedays].reverse().forEach((gd) => {
+        const opt = document.createElement('option');
+        opt.value = gd.gamedayId;
+        opt.textContent = `Match ${gd.gamedayId}: ${gd.matchName || ''}${gd.isLive ? ' 🔴 LIVE' : ''} — ${gd.matchDate || ''}`;
+        sel.appendChild(opt);
+      });
+
+      showSelectedMatch();
+    }
+
+    function showSelectedMatch() {
+      if (!matchLbData) return;
+      const gdId = parseInt(document.getElementById('matchSelect').value);
+      const gdIdx = matchLbData.gamedays.findIndex(g => g.gamedayId === gdId);
+      const gd = matchLbData.gamedays[gdIdx];
+      if (!gd) return;
+      const colorMap = matchLbData.memberColorMap;
+
+      // Build previous match rank lookup
+      const prevRankMap = {};
+      if (gdIdx > 0) {
+        const prevGd = matchLbData.gamedays[gdIdx - 1];
+        prevGd.leaderboard.forEach(e => { prevRankMap[e.teamName || e.temname] = e.rank || 0; });
+      }
+
+      const matchRanking = gd.leaderboard
+        .map(entry => ({
+          name: entry.teamName || entry.temname,
+          gdPts: entry.gamedayPoints || 0,
+          totalPts: entry.totalPoints || entry.points || 0,
+          captain: entry.captain || '—',
+          viceCaptain: entry.viceCaptain || '—',
+          overallRank: entry.rank || 0,
+          prevRank: prevRankMap[entry.teamName || entry.temname] || null,
+          boosterId: entry.boosterId || null,
+        }))
+        .sort((a, b) => b.gdPts - a.gdPts);
+
+      const best = matchRanking[0];
+      const worst = matchRanking[matchRanking.length - 1];
+
+      const boosterUsers = matchRanking.filter(e => e.boosterId);
+      let html = `<p class="subtitle" style="margin-bottom:6px;">🏆 Best: <strong style="color:${colorMap[best.name] || '#fff'}">${best.name}</strong> (${best.gdPts} pts) &nbsp;|&nbsp; Lowest: <strong style="color:${colorMap[worst.name] || '#fff'}">${worst.name}</strong> (${worst.gdPts} pts)</p>`;
+      if (boosterUsers.length > 0) {
+        const boosterSummary = boosterUsers.map(e => `<strong style="color:${colorMap[e.name] || '#fff'}">${e.name}</strong> used ${boosterLabel(e.boosterId)}`).join(' &nbsp;|&nbsp; ');
+        html += `<p class="subtitle" style="margin-bottom:6px;">🔥 Boosters: ${boosterSummary}</p>`;
+      }
+      html += `<p class="subtitle" style="margin-bottom:14px;font-size:12px;opacity:0.7;">Rank change is compared to previous match standings</p>`;
+      html += `<table><thead><tr>`;
+      html += `<th>#</th><th>Team</th><th>Match Pts</th><th>Booster</th><th>Captain</th><th>Vice Captain</th><th>Overall Rank</th><th>Rank Change</th><th>Cumulative Pts</th>`;
+      html += `</tr></thead><tbody>`;
+
+      matchRanking.forEach((entry, pos) => {
+        const color = colorMap[entry.name] || '#8b8fa3';
+        const medal = pos === 0 ? '🥇' : pos === 1 ? '🥈' : pos === 2 ? '🥉' : `${pos + 1}`;
+        const barWidth = best.gdPts > 0 ? Math.round((entry.gdPts / best.gdPts) * 100) : 0;
+
+        let changeHtml = '<span class="rank-same">—</span>';
+        if (entry.prevRank != null) {
+          const diff = entry.prevRank - entry.overallRank;
+          if (diff > 0) changeHtml = `<span class="rank-up">▲${diff}</span>`;
+          else if (diff < 0) changeHtml = `<span class="rank-down">▼${Math.abs(diff)}</span>`;
+          else changeHtml = `<span class="rank-same">● 0</span>`;
+        }
+
+        const boosterBadge = entry.boosterId
+          ? `<span style="background:#ff9f43;color:#000;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">${boosterLabel(entry.boosterId)}</span>`
+          : '<span style="opacity:0.3;">—</span>';
+
+        html += `<tr>
+          <td style="font-weight:700;text-align:center;">${medal}</td>
+          <td><span class="dot" style="background:${color};margin-right:8px;"></span>${entry.name}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-weight:700;min-width:45px;">${entry.gdPts}</span>
+              <div style="background:${color}33;border-radius:4px;height:14px;width:${barWidth}%;max-width:120px;min-width:2px;">
+                <div style="background:${color};border-radius:4px;height:100%;width:100%;"></div>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center;">${boosterBadge}</td>
+          <td style="font-size:12px;">${entry.captain}</td>
+          <td style="font-size:12px;">${entry.viceCaptain}</td>
+          <td style="text-align:center;">#${entry.overallRank}</td>
+          <td style="text-align:center;">${changeHtml}</td>
+          <td>${entry.totalPts}</td>
+        </tr>`;
+      });
+
+      html += `</tbody></table>`;
+      document.getElementById('matchLeaderboards').innerHTML = html;
+    }
+
+    // ---- View Switching ----
+    function switchView(view) {
+      document.querySelectorAll('.view-tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
+      document.getElementById('rankView').style.display = view === 'rank' ? '' : 'none';
+      document.getElementById('pointsView').style.display = view === 'points' ? '' : 'none';
+      document.getElementById('gdPointsView').style.display = view === 'points' ? '' : 'none';
+      document.getElementById('tableView').style.display = view === 'table' ? '' : 'none';
+      document.getElementById('prizesView').style.display = view === 'prizes' ? '' : 'none';
+      document.getElementById('matchLbView').style.display = view === 'matchLb' ? '' : 'none';
+      document.getElementById('heatmapView').style.display = view === 'heatmap' ? '' : 'none';
+      document.getElementById('raceView').style.display = view === 'race' ? '' : 'none';
+      if (view === 'race') stopRace();
+    }
+
+    // ---- Standings Table ----
+    function renderTable(gamedays, members) {
+      let html = '<p class="subtitle" style="margin-bottom:16px;">Rank change is compared to Match 1 standings (baseline)</p>';
+      html += '<table><thead><tr>';
+      html += '<th>#</th><th>Team</th><th>Points</th><th>Last Match Pts</th><th>Rank (M1→Now)</th>';
+      html += '<th>Transfers Left</th><th>Boosters Used</th><th>Best Rank</th><th>Worst Rank</th>';
+      html += '</tr></thead><tbody>';
+
+      members.forEach(([name, data], i) => {
+        const currentRank = data.ranks.filter((r) => r != null).pop() || '—';
+        const firstRank = data.ranks.find((r) => r != null);
+        const currentPts = data.points.filter((p) => p != null).pop() || '—';
+        const lastGdPts = data.gdPoints.filter((p) => p != null).pop() || '—';
+        const validRanks = data.ranks.filter((r) => r != null);
+        const bestRank = validRanks.length ? Math.min(...validRanks) : '—';
+        const worstRank = validRanks.length ? Math.max(...validRanks) : '—';
+
+        let changeHtml = '<span class="rank-same">—</span>';
+        if (firstRank != null && currentRank !== '—' && validRanks.length > 1) {
+          const diff = firstRank - currentRank;
+          if (diff > 0) changeHtml = `<span class="rank-up">#${firstRank} → #${currentRank} ▲${diff}</span>`;
+          else if (diff < 0) changeHtml = `<span class="rank-down">#${firstRank} → #${currentRank} ▼${Math.abs(diff)}</span>`;
+          else changeHtml = `<span class="rank-same">#${firstRank} → #${currentRank} ●0</span>`;
+        }
+
+        // Booster count and transfers
+        const boosterCount = (data.boosters || []).filter(b => b != null).length;
+        const totalBoosters = 10;
+        const boosterHtml = `${boosterCount}/${totalBoosters}`;
+        const subsHtml = data.subsTotal != null && data.subsLeft != null
+          ? `${data.subsLeft}/${data.subsTotal}`
+          : data.subsLeft != null ? `${data.subsLeft}` : '—';
+
+        const color = COLORS[i % COLORS.length];
+        html += `<tr>
+          <td><span style="color:${color};font-weight:700;">${currentRank}</span></td>
+          <td><span class="dot" style="background:${color};margin-right:8px;"></span>${name}</td>
+          <td>${currentPts}</td>
+          <td>${lastGdPts}</td>
+          <td>${changeHtml}</td>
+          <td style="text-align:center;">${subsHtml}</td>
+          <td style="text-align:center;">${boosterHtml}</td>
+          <td>${bestRank}</td>
+          <td>${worstRank}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      document.getElementById('standingsTable').innerHTML = html;
+      document.getElementById('standingsHeading').textContent = `Current Standings (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})`;
+    }
+
+    // ---- Prizes ----
+    function renderPrizes(gamedays, members, data) {
+      const CARD = 'background:linear-gradient(135deg,#2a2d3a,#1a1d28);border:1px solid var(--border);border-radius:12px;padding:16px;';
+      const MEDAL = ['🥇','🥈','🥉'];
+      const memberColorMap = {};
+      members.forEach(([name], i) => { memberColorMap[name] = COLORS[i % COLORS.length]; });
+
+      const allMembers = members;
+      const leaderPts = allMembers[0]?.[1].points.filter(p => p != null).pop() || 0;
+
+      // Booster ranking
+      const boosterRanking = (data.members || [])
+        .map(m => ({
+          name: m.teamName,
+          totalBoosterPts: m.totalBoosterPoints || 0,
+          boosterCount: m.boosterCount || 0,
+          details: m.boosterDetails || [],
+        }))
+        .sort((a, b) => b.totalBoosterPts - a.totalBoosterPts);
+
+      // Playoff ranking
+      const playoffGds = gamedays.filter(gd => gd.gamedayId >= 57);
+      let playoffRanking = null;
+      if (playoffGds.length > 0) {
+        const playoffPts = {};
+        members.forEach(([name]) => { playoffPts[name] = 0; });
+        playoffGds.forEach((gd) => {
+          gd.leaderboard.forEach(e => {
+            const name = e.teamName || e.temname;
+            playoffPts[name] = (playoffPts[name] || 0) + (e.gamedayPoints || 0);
+          });
+        });
+        playoffRanking = Object.entries(playoffPts)
+          .map(([name, pts]) => ({ name, pts }))
+          .sort((a, b) => b.pts - a.pts);
+      }
+
+      let html = `<p class="subtitle" style="margin-bottom:16px;">Prize pool: $900 (12 × $75). After ${gamedays.length} match${gamedays.length !== 1 ? 'es' : ''}.</p>`;
+
+      // Use a 2-column grid for the prize cards
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
+
+      // ── Prize 1-3: Top 3 Overall (combined card) ──
+      html += `<div style="${CARD}">`;
+      html += `<h4 style="margin:0 0 8px 0;">👑 Top 3 Overall — <span style="color:#fdcb6e;">$375 / $200 / $150</span></h4>`;
+      html += `<table style="font-size:13px;"><thead><tr><th>#</th><th>Team</th><th>Points</th><th>Gap</th></tr></thead><tbody>`;
+      allMembers.forEach(([name, d], i) => {
+        const pts = d.points.filter(p => p != null).pop() || 0;
+        const gap = i === 0 ? '—' : `${(pts - leaderPts).toFixed(1)}`;
+        const color = memberColorMap[name] || '#8b8fa3';
+        const prize = i === 0 ? '$375' : i === 1 ? '$200' : i === 2 ? '$150' : '';
+        const prizeHtml = prize ? `<span style="color:#fdcb6e;font-size:11px;"> ${prize}</span>` : '';
+        const rank = i < MEDAL.length ? MEDAL[i] : `${i + 1}`;
+        html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${name}${prizeHtml}</td><td style="font-weight:700;">${pts}</td><td>${gap}</td></tr>`;
+      });
+      html += `</tbody></table></div>`;
+
+      // ── Prize 4: Master of Boosters ($100) ──
+      html += `<div style="${CARD}">`;
+      html += `<h4 style="margin:0 0 8px 0;">🔥 Master of Boosters — <span style="color:#fdcb6e;">$100</span></h4>`;
+      const anyBoosters = boosterRanking.some(b => b.totalBoosterPts > 0);
+      if (anyBoosters) {
+        html += `<table style="font-size:13px;"><thead><tr><th>#</th><th>Team</th><th>Booster Pts</th><th>Used</th><th>Details</th></tr></thead><tbody>`;
+        boosterRanking.forEach((b, i) => {
+          const color = memberColorMap[b.name] || '#8b8fa3';
+          const detailStr = b.details.map(d => `M${d.gd}: ${boosterLabel(d.boosterId)} (${d.boosterPoints})`).join(', ') || '—';
+          const rank = i < MEDAL.length ? MEDAL[i] : `${i + 1}`;
+          html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${b.name}</td>`;
+          html += `<td style="font-weight:700;">${b.totalBoosterPts}</td><td style="text-align:center;">${b.boosterCount}/10</td>`;
+          html += `<td style="font-size:11px;">${detailStr}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      } else {
+        html += `<p style="opacity:0.5;font-size:13px;">No boosters used yet. Race heats up as teams deploy their 10 boosters!</p>`;
+      }
+      html += `</div>`;
+
+      // ── Prize 5: Champion of Playoffs ($75) ──
+      html += `<div style="${CARD}">`;
+      html += `<h4 style="margin:0 0 8px 0;">🏏 Playoff Champion — <span style="color:#fdcb6e;">$75</span></h4>`;
+      if (playoffRanking) {
+        html += `<table style="font-size:13px;"><thead><tr><th>#</th><th>Team</th><th>Playoff Pts</th></tr></thead><tbody>`;
+        playoffRanking.forEach((r, i) => {
+          const color = memberColorMap[r.name] || '#8b8fa3';
+          const rank = i < MEDAL.length ? MEDAL[i] : `${i + 1}`;
+          html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${r.name}</td><td style="font-weight:700;">${r.pts}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      } else {
+        html += `<p style="opacity:0.5;font-size:13px;">⏳ Playoffs haven't started yet.</p>`;
+      }
+      html += `</div>`;
+
+      html += `</div>`; // close grid
+
+      document.getElementById('prizesContent').innerHTML = html;
+      document.getElementById('prizesHeading').textContent = `Prize Contenders (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})`;
+    }
+
+    // ---- Rank Heatmap ----
+    function renderHeatmap(labels, gamedays, members, matchDetails) {
+      const numMembers = members.length;
+      function rankColor(rank, total) {
+        const t = (rank - 1) / Math.max(total - 1, 1);
+        // green (#00b894) → yellow (#fdcb6e) → red (#e17055)
+        let r, g, b;
+        if (t <= 0.5) {
+          const s = t * 2;
+          r = Math.round(0 + s * 253); g = Math.round(184 + s * (203 - 184)); b = Math.round(148 + s * (110 - 148));
+        } else {
+          const s = (t - 0.5) * 2;
+          r = Math.round(253 + s * (225 - 253)); g = Math.round(203 + s * (112 - 203)); b = Math.round(110 + s * (85 - 110));
+        }
+        return `rgb(${r},${g},${b})`;
+      }
+
+      let html = '<table class="heatmap-table"><thead><tr><th>Team</th>';
+      labels.forEach((lbl, i) => {
+        const md = matchDetails[i];
+        html += `<th title="${md.name} (${md.date})">${lbl}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+
+      members.forEach(([name, data], mi) => {
+        const color = COLORS[mi % COLORS.length];
+        html += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name}</td>`;
+        data.ranks.forEach((rank, gi) => {
+          const bid = data.boosters ? data.boosters[gi] : null;
+          const boosterTip = bid ? ` — ${boosterLabel(bid)}` : '';
+          const boosterMark = bid ? ' 🔥' : '';
+          if (rank == null) {
+            html += '<td class="hm-cell" style="color:var(--text-dim);">—</td>';
+          } else {
+            const bg = rankColor(rank, numMembers);
+            const textColor = rank <= numMembers * 0.4 ? '#000' : '#fff';
+            html += `<td class="hm-cell" style="background:${bg};color:${textColor};" title="#${rank}${boosterTip}">${rank}${boosterMark}</td>`;
+          }
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      document.getElementById('heatmapContainer').innerHTML = html;
+    }
+
+    // ---- Bar Chart Race ----
+    let raceData = null;
+    let raceIdx = 0;
+    let raceTimer = null;
+    const ROW_H = 40; // row height including gap
+
+    function initRace(gamedays, members, matchDetails) {
+      const memberColors = {};
+      members.forEach(([name], i) => { memberColors[name] = COLORS[i % COLORS.length]; });
+
+      const snapshots = gamedays.map((gd, gi) => {
+        const entries = members.map(([name, data]) => ({
+          name,
+          pts: data.points[gi] || 0,
+          gdPts: data.gdPoints[gi] || 0,
+          color: memberColors[name],
+        }));
+        entries.sort((a, b) => b.pts - a.pts);
+        return entries;
+      });
+
+      raceData = { snapshots, matchDetails, gamedays };
+      raceIdx = 0;
+
+      const slider = document.getElementById('raceSlider');
+      slider.max = snapshots.length - 1;
+      slider.value = 0;
+
+      // Set container height
+      document.getElementById('raceBars').style.height = (members.length * ROW_H) + 'px';
+      // Clear so first render builds DOM
+      document.getElementById('raceBars').innerHTML = '';
+      renderRaceFrame(0);
+    }
+
+    function renderRaceFrame(idx) {
+      if (!raceData) return;
+      const snap = raceData.snapshots[idx];
+      const md = raceData.matchDetails[idx];
+      const maxPts = Math.max(...snap.map(e => e.pts), 1);
+
+      document.getElementById('raceLabel').textContent =
+        `Match ${md.gamedayId}: ${md.name} (${md.date})`;
+      document.getElementById('raceSlider').value = idx;
+
+      const container = document.getElementById('raceBars');
+
+      if (container.children.length === 0) {
+        let html = '';
+        snap.forEach((entry, pos) => {
+          const w = Math.max(Math.round((entry.pts / maxPts) * 100), 1);
+          html += `<div class="race-row" data-name="${entry.name}" style="top:${pos * ROW_H}px">
+            <div class="race-name" style="color:${entry.color}">${entry.name}</div>
+            <div class="race-bar" style="width:${w}%;background:${entry.color};">${entry.pts}</div>
+            <span style="font-size:11px;color:var(--text-dim);min-width:60px;">+${entry.gdPts}</span>
+          </div>`;
+        });
+        container.innerHTML = html;
+      } else {
+        snap.forEach((entry, pos) => {
+          const row = container.querySelector(`[data-name="${CSS.escape(entry.name)}"]`);
+          if (!row) return;
+          row.style.top = (pos * ROW_H) + 'px';
+          const bar = row.querySelector('.race-bar');
+          const w = Math.max(Math.round((entry.pts / maxPts) * 100), 1);
+          bar.style.width = w + '%';
+          bar.textContent = entry.pts;
+          const gdEl = row.querySelector('span:last-child');
+          gdEl.textContent = '+' + entry.gdPts;
+        });
+      }
+    }
+
+    function toggleRace() {
+      if (raceTimer) { stopRace(); return; }
+      const btn = document.getElementById('racePlayBtn');
+      btn.textContent = '⏸ Pause';
+      if (raceIdx >= raceData.snapshots.length - 1) raceIdx = -1;
+      advanceRace();
+    }
+
+    function advanceRace() {
+      if (!raceData) return;
+      raceIdx++;
+      if (raceIdx >= raceData.snapshots.length) { stopRace(); return; }
+      renderRaceFrame(raceIdx);
+      const speed = parseInt(document.getElementById('raceSpeed').value) || 800;
+      raceTimer = setTimeout(advanceRace, speed);
+    }
+
+    function stopRace() {
+      clearTimeout(raceTimer);
+      raceTimer = null;
+      const btn = document.getElementById('racePlayBtn');
+      if (btn) btn.textContent = '▶ Play';
+    }
+
+    function raceStep(dir) {
+      stopRace();
+      if (!raceData) return;
+      raceIdx = Math.max(0, Math.min(raceData.snapshots.length - 1, raceIdx + dir));
+      renderRaceFrame(raceIdx);
+    }
+
+    function raceSeek(val) {
+      stopRace();
+      raceIdx = parseInt(val);
+      renderRaceFrame(raceIdx);
+    }
+  </script>
+</body>
+</html>
