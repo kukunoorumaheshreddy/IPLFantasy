@@ -400,7 +400,7 @@
         <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
         <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
         <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
-        <button class="view-tab" data-view="points" onclick="switchView('points')" style="display:none;">Points Progression</button>
+        <button class="view-tab" data-view="pointsAnim" onclick="switchView('pointsAnim')">Points Progression</button>
       </div>
 
       <!-- Rank Chart -->
@@ -465,6 +465,28 @@
           <div id="raceBars"></div>
         </div>
       </div>
+      <!-- Points Progression (Animated) -->
+      <div class="chart-section" id="pointsAnimView" style="display:none;">
+        <h3>Points Progression</h3>
+        <p class="subtitle">Watch cumulative points build up match by match.</p>
+        <div class="race-ctrls" id="ptsAnimCtrls" style="margin-bottom:8px;">
+          <button onclick="ptsAnimToggle()">▶ Play</button>
+          <button onclick="ptsAnimStep(-1)">⏮</button>
+          <button onclick="ptsAnimStep(1)">⏭</button>
+          <input type="range" id="ptsAnimSlider" min="0" max="1000" value="1000" oninput="ptsAnimSeek(+this.value)" style="flex:1;min-width:100px;accent-color:var(--accent);" />
+          <span class="rlabel" id="ptsAnimLabel" style="min-width:80px;">—</span>
+          <select id="ptsAnimSpeed" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
+            <option value="3000">Slow</option>
+            <option value="1800" selected>Normal</option>
+            <option value="1000">Fast</option>
+          </select>
+        </div>
+        <div style="position:relative;height:500px;background:var(--surface);border-radius:8px;overflow:hidden;">
+          <canvas id="ptsAnimCanvas" style="width:100%;height:100%;"></canvas>
+        </div>
+        <div id="ptsAnimLegend" style="display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;padding:12px 0;"></div>
+      </div>
+
     </div>
   </div>
 
@@ -666,6 +688,7 @@
       // New visualizations
       renderHeatmap(labels, gamedays, members, matchDetails);
       initRace(gamedays, members, matchDetails);
+      renderPtsAnimChart(labels, members, matchDetails);
     }
 
     function renderStats(gamedays, members) {
@@ -851,6 +874,227 @@
         rankChart.update('none');
       });
     }
+
+    // ---- Animated Points Progression (smooth line drawing) ----
+    let ptsAnim = { labels: [], members: [], matchDetails: [], playing: false, rafId: null, progress: 1, startTime: 0, pausedProgress: 1 };
+
+    function renderPtsAnimChart(labels, members, matchDetails) {
+      ptsAnim = { labels, members, matchDetails, playing: false, rafId: null, progress: 1, startTime: 0, pausedProgress: 1 };
+
+      // Build legend
+      let legHtml = '';
+      members.forEach(([name], i) => {
+        const c = COLORS[i % COLORS.length];
+        legHtml += `<span style="display:inline-flex;align-items:center;gap:4px;font-size:13px;"><span style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block;"></span>${name}</span>`;
+      });
+      document.getElementById('ptsAnimLegend').innerHTML = legHtml;
+
+      ptsAnimDraw(1);
+      document.getElementById('ptsAnimSlider').value = 1000;
+      ptsAnimUpdateLabel(1);
+    }
+
+    function ptsAnimDraw(progress) {
+      const canvas = document.getElementById('ptsAnimCanvas');
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      const W = rect.width, H = rect.height;
+      ctx.clearRect(0, 0, W, H);
+
+      const { labels, members } = ptsAnim;
+      const total = labels.length;
+      if (total === 0) return;
+
+      const pad = { top: 30, bottom: 40, left: 60, right: 140 };
+      const plotW = W - pad.left - pad.right;
+      const plotH = H - pad.top - pad.bottom;
+
+      // Find max points for y-axis
+      let maxPts = 0;
+      members.forEach(([, d]) => d.points.forEach(p => { if (p != null && p > maxPts) maxPts = p; }));
+      maxPts = Math.ceil(maxPts * 1.05);
+
+      const xStep = plotW / (total - 1 || 1);
+      const toX = (i) => pad.left + i * xStep;
+      const toY = (v) => pad.top + plotH - (v / maxPts) * plotH;
+
+      // Draw grid lines and labels
+      ctx.strokeStyle = '#2a2d3a';
+      ctx.lineWidth = 1;
+      ctx.font = '12px -apple-system, sans-serif';
+      ctx.fillStyle = '#8b8fa3';
+
+      // Y-axis gridlines
+      const yTicks = 5;
+      for (let i = 0; i <= yTicks; i++) {
+        const v = Math.round(maxPts * i / yTicks);
+        const y = toY(v);
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.fillText(v.toLocaleString(), pad.left - 8, y);
+      }
+
+      // X-axis labels
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      labels.forEach((lbl, i) => {
+        ctx.fillStyle = '#8b8fa3';
+        ctx.fillText(lbl, toX(i), H - pad.bottom + 8);
+      });
+
+      // How far to draw
+      const exactMatch = progress * (total - 1); // 0-based position along the line
+      const fullSegments = Math.floor(exactMatch);
+      const frac = exactMatch - fullSegments;
+
+      // Draw each team's line
+      members.forEach(([name, data], mi) => {
+        const pts = data.points;
+        const color = COLORS[mi % COLORS.length];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        ctx.beginPath();
+        let lastDrawnX = 0, lastDrawnY = 0;
+        let started = false;
+
+        for (let i = 0; i <= Math.min(fullSegments, total - 1); i++) {
+          if (pts[i] == null) continue;
+          const x = toX(i), y = toY(pts[i]);
+          if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+          lastDrawnX = x; lastDrawnY = y;
+        }
+
+        // Interpolate into next segment
+        if (frac > 0 && fullSegments < total - 1 && pts[fullSegments] != null && pts[fullSegments + 1] != null) {
+          const x1 = toX(fullSegments), y1 = toY(pts[fullSegments]);
+          const x2 = toX(fullSegments + 1), y2 = toY(pts[fullSegments + 1]);
+          lastDrawnX = x1 + (x2 - x1) * frac;
+          lastDrawnY = y1 + (y2 - y1) * frac;
+          ctx.lineTo(lastDrawnX, lastDrawnY);
+        }
+
+        ctx.stroke();
+
+        // Draw dot at the leading edge
+        if (started) {
+          ctx.beginPath();
+          ctx.arc(lastDrawnX, lastDrawnY, 4, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = '#1a1d28';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Team name label at leading edge
+          if (progress < 0.95) {
+            ctx.font = 'bold 10px -apple-system, sans-serif';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(name, lastDrawnX + 8, lastDrawnY);
+          }
+        }
+
+        // Draw dots on completed points
+        for (let i = 0; i <= Math.min(fullSegments, total - 1); i++) {
+          if (pts[i] == null) continue;
+          ctx.beginPath();
+          ctx.arc(toX(i), toY(pts[i]), 3, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      });
+
+      // Team labels at end when fully drawn — de-overlap vertically
+      if (progress >= 0.95) {
+        const labelData = [];
+        members.forEach(([name, data], mi) => {
+          const pts = data.points;
+          const last = pts[pts.length - 1];
+          if (last == null) return;
+          labelData.push({ name, last, y: toY(last), color: COLORS[mi % COLORS.length] });
+        });
+        // Sort by Y position and nudge overlapping labels apart
+        labelData.sort((a, b) => a.y - b.y);
+        const minGap = 14;
+        for (let i = 1; i < labelData.length; i++) {
+          if (labelData[i].y - labelData[i - 1].y < minGap) {
+            labelData[i].y = labelData[i - 1].y + minGap;
+          }
+        }
+        labelData.forEach(({ name, last, y, color }) => {
+          ctx.font = 'bold 11px -apple-system, sans-serif';
+          ctx.fillStyle = color;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${name} (${last})`, toX(total - 1) + 8, y);
+        });
+      }
+    }
+
+    function ptsAnimUpdateLabel(progress) {
+      const { labels, matchDetails } = ptsAnim;
+      const total = labels.length;
+      const matchIdx = Math.min(Math.ceil(progress * (total - 1)), total - 1);
+      const md = matchDetails[matchIdx];
+      document.getElementById('ptsAnimLabel').textContent = md ? `M${md.gamedayId}: ${md.name}` : '—';
+    }
+
+    function ptsAnimToggle() {
+      if (ptsAnim.playing) {
+        ptsAnimStop();
+      } else {
+        ptsAnim.playing = true;
+        document.querySelector('#ptsAnimCtrls button').textContent = '⏸ Pause';
+        if (ptsAnim.progress >= 0.99) ptsAnim.progress = 0;
+        const speedMs = parseInt(document.getElementById('ptsAnimSpeed').value) || 1800;
+        const totalDuration = speedMs * ptsAnim.labels.length;
+        ptsAnim.startTime = performance.now() - (ptsAnim.progress * totalDuration);
+
+        function frame(now) {
+          if (!ptsAnim.playing) return;
+          const speedMs = parseInt(document.getElementById('ptsAnimSpeed').value) || 1800;
+          const totalDuration = speedMs * ptsAnim.labels.length;
+          const p = Math.min((now - ptsAnim.startTime) / totalDuration, 1);
+          ptsAnim.progress = p;
+          ptsAnimDraw(p);
+          document.getElementById('ptsAnimSlider').value = Math.round(p * 1000);
+          ptsAnimUpdateLabel(p);
+          if (p < 1) ptsAnim.rafId = requestAnimationFrame(frame);
+          else ptsAnimStop();
+        }
+        ptsAnim.rafId = requestAnimationFrame(frame);
+      }
+    }
+
+    function ptsAnimStop() {
+      ptsAnim.playing = false;
+      if (ptsAnim.rafId) cancelAnimationFrame(ptsAnim.rafId);
+      ptsAnim.rafId = null;
+      document.querySelector('#ptsAnimCtrls button').textContent = '▶ Play';
+    }
+
+    function ptsAnimStep(dir) {
+      ptsAnimStop();
+      const step = 1 / (ptsAnim.labels.length - 1 || 1);
+      ptsAnim.progress = Math.max(0, Math.min(1, ptsAnim.progress + dir * step));
+      ptsAnimDraw(ptsAnim.progress);
+      document.getElementById('ptsAnimSlider').value = Math.round(ptsAnim.progress * 1000);
+      ptsAnimUpdateLabel(ptsAnim.progress);
+    }
+
+    function ptsAnimSeek(val) {
+      ptsAnimStop();
+      ptsAnim.progress = val / 1000;
+      ptsAnimDraw(ptsAnim.progress);
+      ptsAnimUpdateLabel(ptsAnim.progress);
+    }
+
     // ---- Per-Match Leaderboard ----
     let matchLbData = null; // stored for dropdown re-render
 
@@ -964,7 +1208,9 @@
       document.getElementById('matchLbView').style.display = view === 'matchLb' ? '' : 'none';
       document.getElementById('heatmapView').style.display = view === 'heatmap' ? '' : 'none';
       document.getElementById('raceView').style.display = view === 'race' ? '' : 'none';
+      document.getElementById('pointsAnimView').style.display = view === 'pointsAnim' ? '' : 'none';
       if (view === 'race') stopRace();
+      if (view !== 'pointsAnim') ptsAnimStop();
     }
 
     // ---- Standings Table ----
