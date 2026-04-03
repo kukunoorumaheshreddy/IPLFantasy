@@ -5,10 +5,6 @@ v1/
 start-dashboard.bat
 HANDOFF.md
 
-# Browser console scripts (contain API details, not for public)
-v2/update-data.js
-v2/update-data-v3.js
-
 # OS files
 Thumbs.db
 .DS_Store
