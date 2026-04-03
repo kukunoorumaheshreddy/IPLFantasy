@@ -266,7 +266,7 @@
   </header>
 
   <div class="container">
-    <!-- Loading indicator -->
+    <!-- Loading indicator (hidden for public) -->
     <div id="autoLoadStatus" style="display:none;">
       <div class="instructions">
         <h3>⏳ Auto-loading latest data...</h3>
@@ -274,8 +274,8 @@
       </div>
     </div>
 
-    <!-- Upload Section -->
-    <div id="uploadSection">
+    <!-- Upload Section (hidden for public) -->
+    <div id="uploadSection" style="display:none;">
       <div class="instructions">
         <h3>📋 How to get your league data</h3>
         <ol>
@@ -463,18 +463,16 @@
     // ---- Auto-load: try master-snapshots/ipl-fantasy-v2-master-gdN.json from high to low ----
     (async function autoLoad() {
       const statusEl = document.getElementById('autoLoadStatus');
-      const msgEl = document.getElementById('autoLoadMsg');
-      statusEl.style.display = '';
 
       // Try gd70 down to gd1 (IPL has max 70 matches)
       for (let gd = 70; gd >= 1; gd--) {
         const filename = `master-snapshots/ipl-fantasy-v2-master-gd${gd}.json`;
         try {
-          msgEl.textContent = `Trying ${filename}...`;
           const res = await fetch(filename);
           if (!res.ok) continue;
-          const text = await res.text();
-          const data = JSON.parse(text);
+          const ct = res.headers.get('content-type') || '';
+          if (!ct.includes('json')) continue;
+          const data = JSON.parse(await res.text());
           if (data && data.gamedays && data.gamedays.length > 0) {
             currentFileName = `ipl-fantasy-v2-master-gd${gd}.json`;
             statusEl.style.display = 'none';
