@@ -121,7 +121,7 @@
     }
     .chart-wrapper { position: relative; width: 100%; }
     .chart-wrapper.rank-chart { height: 700px; }
-    .chart-wrapper.points-chart { height: 500px; }
+    .chart-wrapper { height: 500px; }
 
     /* Heatmap */
     .heatmap-scroll { overflow-x: auto; margin-top: 16px; }
@@ -303,11 +303,11 @@
 
     <!-- Dashboard (hidden until data loaded) -->
     <div class="dashboard" id="dashboard">
-      <!-- Snapshot switcher -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <!-- Snapshot switcher (hidden for public) -->
+      <div style="display:none;">
         <span style="color:var(--text-dim);font-size:14px;">📄 Loaded:</span>
         <strong id="loadedFile" style="font-size:14px;color:var(--accent-light);">—</strong>
-        <button class="btn" style="padding:6px 16px;font-size:13px;display:none;" onclick="document.getElementById('switchFileInput').click()">Load Different Snapshot</button>
+        <button class="btn" style="padding:6px 16px;font-size:13px;" onclick="document.getElementById('switchFileInput').click()">Load Different Snapshot</button>
         <input type="file" id="switchFileInput" accept=".json" style="display:none;" />
       </div>
 
@@ -322,7 +322,7 @@
         <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
         <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
         <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
-        <button class="view-tab" data-view="points" onclick="switchView('points')">Points Progression</button>
+        <button class="view-tab" data-view="points" onclick="switchView('points')" style="display:none;">Points Progression</button>
       </div>
 
       <!-- Rank Chart -->
@@ -336,24 +336,6 @@
       </div>
 
       <!-- Points Chart -->
-      <div class="chart-section" id="pointsView" style="display:none;">
-        <h3>Cumulative Points Progression</h3>
-        <p class="subtitle">Total fantasy points accumulated over the tournament</p>
-        <div class="controls" id="pointsControls"></div>
-        <div class="chart-wrapper points-chart">
-          <canvas id="pointsChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Gameday Points Chart -->
-      <div class="chart-section" id="gdPointsView" style="display:none;">
-        <h3>Points Per Gameday</h3>
-        <p class="subtitle">Fantasy points scored in each individual match</p>
-        <div class="chart-wrapper points-chart">
-          <canvas id="gdPointsChart"></canvas>
-        </div>
-      </div>
-
       <!-- Table View -->
       <div class="table-section" id="tableView">
         <h3 id="standingsHeading" style="margin-bottom:4px;">Current Standings</h3>
@@ -434,8 +416,6 @@
 
     let rawData = null;
     let rankChart = null;
-    let pointsChart = null;
-    let gdPointsChart = null;
     let visibleTeams = new Set();
 
     // ---- File loading ----
@@ -593,12 +573,9 @@
 
       // Controls (team toggles)
       renderControls(members, 'rankControls');
-      renderControls(members, 'pointsControls');
 
       // Charts
       renderRankChart(labels, members, matchDetails);
-      renderPointsChart(labels, members, matchDetails);
-      renderGdPointsChart(labels, members, matchDetails);
 
       // Tables
       renderTable(gamedays, members);
@@ -612,11 +589,26 @@
 
     function renderStats(gamedays, members) {
       const lastGd = gamedays[gamedays.length - 1];
+      const leaderName = members[0]?.[0] || '—';
+      const leaderPts = members[0]?.[1].points.filter(p=>p!=null).pop() || '—';
+
+      // Best single-match score across all teams
+      let bestMatch = { name: '—', pts: 0, matchIdx: 0 };
+      members.forEach(([name, data]) => {
+        data.gdPoints.forEach((pts, i) => {
+          if (pts != null && pts > bestMatch.pts) {
+            bestMatch = { name, pts, matchIdx: i };
+          }
+        });
+      });
+      const bestGd = gamedays[bestMatch.matchIdx];
+      const bestMatchLabel = bestGd ? `${bestGd.matchName} (M${bestGd.gamedayId})` : '';
+
       const html = `
         <div class="stat-card"><div class="label">Members</div><div class="value">${members.length}</div></div>
         <div class="stat-card"><div class="label">Matches Played</div><div class="value">${gamedays.length}</div></div>
-        <div class="stat-card"><div class="label">Leader</div><div class="value" style="font-size:18px;">${members[0]?.[0] || '—'}</div></div>
-        <div class="stat-card"><div class="label">Top Points</div><div class="value">${members[0]?.[1].points.filter(p=>p!=null).pop() || '—'}</div></div>
+        <div class="stat-card"><div class="label">League Leader</div><div class="value" style="font-size:18px;">${leaderName}<span style="font-size:12px;color:var(--text-dim);display:block;">${leaderPts} pts</span></div></div>
+        <div class="stat-card"><div class="label">Best Single Match</div><div class="value">${bestMatch.pts}<span style="font-size:12px;color:var(--text-dim);display:block;">${bestMatch.name}</span><span style="font-size:11px;color:var(--text-dim);display:block;">${bestMatchLabel}</span></div></div>
       `;
       document.getElementById('statsRow').innerHTML = html;
     }
@@ -656,7 +648,7 @@
     }
 
     function updateChartVisibility() {
-      [rankChart, pointsChart, gdPointsChart].forEach((chart) => {
+      [rankChart].forEach((chart) => {
         if (!chart) return;
         chart.data.datasets.forEach((ds) => {
           ds.hidden = !visibleTeams.has(ds.label);
@@ -778,84 +770,6 @@
         rankChart.update('none');
       });
     }
-    function renderPointsChart(labels, members, matchDetails) {
-      const ctx = document.getElementById('pointsChart').getContext('2d');
-      if (pointsChart) pointsChart.destroy();
-
-      const datasets = members.map(([name, data], i) => ({
-        label: name,
-        data: data.points,
-        borderColor: COLORS[i % COLORS.length],
-        backgroundColor: COLORS[i % COLORS.length] + '22',
-        borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 8,
-        pointBackgroundColor: COLORS[i % COLORS.length],
-        pointBorderColor: '#1a1d28', pointBorderWidth: 1.5,
-        tension: 0.3, spanGaps: true, fill: false,
-        hidden: !visibleTeams.has(name),
-      }));
-
-      pointsChart = new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          layout: { padding: { top: 10, right: 10 } },
-          scales: {
-            y: { title: { display: true, text: 'Total Points', color: '#8b8fa3', font: { size: 14 } }, ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' }, beginAtZero: true },
-            x: { ticks: { color: '#8b8fa3', maxRotation: 0, font: { size: 13, weight: 'bold' } }, grid: { color: '#2a2d3a22' } },
-          },
-          plugins: {
-            legend: { display: true, position: 'bottom', labels: { color: '#e1e4ec', font: { size: 13 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } },
-            tooltip: {
-              backgroundColor: '#1a1d28ee', borderColor: '#2a2d3a', borderWidth: 1,
-              callbacks: {
-                title: (items) => { const md = matchDetails[items[0]?.dataIndex]; return md ? `Match ${md.gamedayId}: ${md.name} (${md.date})` : items[0]?.label; },
-                label: (ctx) => `  ${ctx.dataset.label}: ${ctx.parsed.y} pts`,
-              },
-            },
-          },
-        },
-      });
-    }
-
-    // ---- Gameday Points Bar Chart ----
-    function renderGdPointsChart(labels, members, matchDetails) {
-      const ctx = document.getElementById('gdPointsChart').getContext('2d');
-      if (gdPointsChart) gdPointsChart.destroy();
-
-      const datasets = members.map(([name, data], i) => ({
-        label: name,
-        data: data.gdPoints,
-        backgroundColor: COLORS[i % COLORS.length] + 'aa',
-        borderColor: COLORS[i % COLORS.length],
-        borderWidth: 1,
-        hidden: !visibleTeams.has(name),
-      }));
-
-      gdPointsChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          scales: {
-            y: { title: { display: true, text: 'Match Points', color: '#8b8fa3' }, ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } },
-            x: { ticks: { color: '#8b8fa3', maxRotation: 0, font: { size: 13, weight: 'bold' } }, grid: { color: '#2a2d3a22' } },
-          },
-          plugins: {
-            legend: { display: true, position: 'bottom', labels: { color: '#e1e4ec', font: { size: 12 }, padding: 12, usePointStyle: true, pointStyle: 'rectRounded' } },
-            tooltip: {
-              backgroundColor: '#1a1d28ee', borderColor: '#2a2d3a', borderWidth: 1,
-              callbacks: {
-                title: (items) => { const md = matchDetails[items[0]?.dataIndex]; return md ? `Match ${md.gamedayId}: ${md.name} (${md.date})` : items[0]?.label; },
-              },
-            },
-          },
-        },
-      });
-    }
-
     // ---- Per-Match Leaderboard ----
     let matchLbData = null; // stored for dropdown re-render
 
@@ -964,8 +878,6 @@
     function switchView(view) {
       document.querySelectorAll('.view-tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
       document.getElementById('rankView').style.display = view === 'rank' ? '' : 'none';
-      document.getElementById('pointsView').style.display = view === 'points' ? '' : 'none';
-      document.getElementById('gdPointsView').style.display = view === 'points' ? '' : 'none';
       document.getElementById('tableView').style.display = view === 'table' ? '' : 'none';
       document.getElementById('prizesView').style.display = view === 'prizes' ? '' : 'none';
       document.getElementById('matchLbView').style.display = view === 'matchLb' ? '' : 'none';
