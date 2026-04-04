@@ -102,6 +102,8 @@
       matchDate: m.Matchdate?.split("T")[0] || null,
       isLive: m.MatchStatus === 1,
       phaseId: m.PhaseId || null,
+      homeTeamId: m.HomeTeamId,
+      awayTeamId: m.AwayTeamId,
     };
   });
 
@@ -173,6 +175,79 @@
 
     log(`  ${m.teamName}: ${Object.keys(perMatch).length} matches, boosters=${val.userbstcnt || 0}`);
     await sleep(DELAY_MS);
+  }
+
+  // ── 3b. Fallback: calculate live match scores using v1 approach ──
+  // Find gamedays that are live/recent but have no points from overall-get
+  const liveGds = gamedayIds.filter(gd => matchInfo[gd]?.isLive);
+  const missingPtsGds = gamedayIds.filter(gd => {
+    // Check if ANY member is missing points for this gameday
+    return members.some(m => {
+      const td = teamData[m.teamName];
+      return td?.perMatch?.[gd] && (td?.gdPtsMap?.[gd] === undefined || td?.gdPtsMap?.[gd] === 0);
+    });
+  });
+  const fallbackGds = [...new Set([...liveGds, ...missingPtsGds])].filter(gd => {
+    // Only fallback for GDs where points are actually missing
+    return members.every(m => !teamData[m.teamName]?.gdPtsMap?.[gd]);
+  });
+
+  const fallbackTimestamps = {}; // gd -> ISO timestamp of when live data was fetched
+
+  if (fallbackGds.length > 0) {
+    log(`\n── Live/missing score fallback for GD: ${fallbackGds.join(', ')} ──`);
+
+    for (const gd of fallbackGds) {
+      log(`Fetching live player points for GD${gd}...`);
+      const playersResp = await apiFetch(
+        `feed/live/gamedayplayers?lang=en&tourgamedayId=${gd}&teamgamedayId=${gd}&liveVersion=999`
+      );
+      const allPlayers = playersResp?.Data?.Value?.Players || [];
+      if (allPlayers.length === 0) {
+        warn(`  GD${gd}: no player data available yet, skipping.`);
+        continue;
+      }
+
+      fallbackTimestamps[gd] = new Date().toISOString();
+
+      // Filter: only use points for players whose IPL team is playing in this fixture
+      // The gamedayplayers API returns ALL players with combined points across all live matches
+      const mi = matchInfo[gd];
+      const matchTeamIds = new Set();
+      if (mi?.homeTeamId) matchTeamIds.add(mi.homeTeamId);
+      if (mi?.awayTeamId) matchTeamIds.add(mi.awayTeamId);
+
+      const playerMap = {};
+      allPlayers.forEach(p => {
+        const playsInThisMatch = matchTeamIds.size === 0 || matchTeamIds.has(p.TeamId);
+        playerMap[p.Id] = {
+          name: p.Name,
+          gdPoints: playsInThisMatch ? (p.GamedayPoints || 0) : 0,
+          teamId: p.TeamId,
+        };
+      });
+      log(`  ${allPlayers.length} players loaded for GD${gd} (${mi?.matchName}), filtered to teams: ${[...matchTeamIds].join(', ')}`);
+
+      for (const m of members) {
+        const td = teamData[m.teamName];
+        const pm = td?.perMatch?.[gd];
+        if (!pm || td.gdPtsMap[gd]) continue;
+
+        let total = 0;
+        (pm.squad || []).forEach(pid => {
+          const p = playerMap[pid];
+          const base = p ? p.gdPoints : 0;
+          let mult = 1;
+          if (pid === pm.captainId) mult = 2;
+          else if (pid === pm.viceCaptainId) mult = 1.5;
+          total += base * mult;
+        });
+        total = Math.round(total * 100) / 100;
+        td.gdPtsMap[gd] = total;
+        log(`  ${m.teamName} GD${gd}: ${total} pts (calculated from live player data)`);
+      }
+      await sleep(DELAY_MS);
+    }
   }
 
   // ── 4. Identify booster matches and fetch player data for them ──
@@ -385,6 +460,8 @@
       matchName: mi.matchName,
       matchDate: mi.matchDate,
       isLive: mi.isLive,
+      isEstimated: fallbackGds.includes(gd),
+      scoresAsOf: fallbackTimestamps[gd] || null,
       leaderboard: ranked,
     });
 

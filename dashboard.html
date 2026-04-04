@@ -597,9 +597,14 @@
       document.getElementById('dashboard').classList.add('visible');
       document.getElementById('loadedFile').textContent = currentFileName + ` (${data.gamedays?.length || 0} matches)`;
 
-      // Build per-member progression
-      const gamedays = data.gamedays.sort((a, b) => a.gamedayId - b.gamedayId);
-      const memberMap = {}; // teamName -> { ranks:[], points:[], gdPoints:[], boosters:[], subsUsed:null, subsTotal:null }
+      // Split into completed vs live/estimated gamedays
+      const allGamedays = data.gamedays.sort((a, b) => a.gamedayId - b.gamedayId);
+      const completedGamedays = allGamedays.filter(gd => !gd.isEstimated && !gd.isLive);
+      const liveGamedays = allGamedays.filter(gd => gd.isEstimated || gd.isLive);
+
+      // Use only completed gamedays for aggregations (standings, prizes, rank, race, heatmap)
+      const gamedays = completedGamedays;
+      const memberMap = {};// teamName -> { ranks:[], points:[], gdPoints:[], boosters:[], subsUsed:null, subsTotal:null }
 
       gamedays.forEach((gd, idx) => {
         const sorted = [...gd.leaderboard].sort((a, b) => {
@@ -662,27 +667,29 @@
       // Initialize all as visible
       visibleTeams = new Set(members.map(([name]) => name));
 
-      // Stats
-      renderStats(gamedays, members);
+      // Stats (pass liveGamedays count for display)
+      renderStats(gamedays, members, liveGamedays.length);
 
       // Controls (team toggles)
       renderControls(members, 'rankControls');
 
-      // Charts
+      // Charts — all use completed gamedays only
       renderRankChart(labels, members, matchDetails);
 
       // Tables
       renderTable(gamedays, members);
       renderPrizes(gamedays, members, data);
-      renderMatchLeaderboard(gamedays, members);
 
-      // New visualizations
+      // Per-match leaderboard gets ALL gamedays (including live)
+      renderMatchLeaderboard(allGamedays, members);
+
+      // New visualizations — completed only
       renderHeatmap(labels, gamedays, members, matchDetails);
       initRace(gamedays, members, matchDetails);
       renderPtsAnimChart(labels, members, matchDetails);
     }
 
-    function renderStats(gamedays, members) {
+    function renderStats(gamedays, members, liveCount) {
       const lastGd = gamedays[gamedays.length - 1];
       const leaderName = members[0]?.[0] || '—';
       const leaderPts = members[0]?.[1].points.filter(p=>p!=null).pop() || '—';
@@ -699,9 +706,13 @@
       const bestGd = gamedays[bestMatch.matchIdx];
       const bestMatchLabel = bestGd ? `${bestGd.matchName} (M${bestGd.gamedayId})` : '';
 
+      const matchesLabel = liveCount > 0
+        ? `${gamedays.length}<span style="font-size:12px;color:var(--text-dim);display:block;">${gamedays.length} completed + ${liveCount} live</span>`
+        : `${gamedays.length}`;
+
       const html = `
         <div class="stat-card"><div class="label">Members</div><div class="value">${members.length}</div></div>
-        <div class="stat-card"><div class="label">Matches Played</div><div class="value">${gamedays.length}</div></div>
+        <div class="stat-card"><div class="label">Matches</div><div class="value">${matchesLabel}</div></div>
         <div class="stat-card"><div class="label">League Leader</div><div class="value" style="font-size:18px;">${leaderName}<span style="font-size:12px;color:var(--text-dim);display:block;">${leaderPts} pts</span></div></div>
         <div class="stat-card"><div class="label">Best Single Match</div><div class="value">${bestMatch.pts}<span style="font-size:12px;color:var(--text-dim);display:block;">${bestMatch.name}</span><span style="font-size:11px;color:var(--text-dim);display:block;">${bestMatchLabel}</span></div></div>
       `;
@@ -1086,7 +1097,19 @@
       const worst = matchRanking[matchRanking.length - 1];
 
       const boosterUsers = matchRanking.filter(e => e.boosterId);
-      let html = `<p class="subtitle" style="margin-bottom:6px;">🏆 Best: <strong style="color:${colorMap[best.name] || '#fff'}">${best.name}</strong> (${best.gdPts} pts) &nbsp;|&nbsp; Lowest: <strong style="color:${colorMap[worst.name] || '#fff'}">${worst.name}</strong> (${worst.gdPts} pts)</p>`;
+      let html = '';
+
+      // Show "scores as of" for live/estimated matches
+      if (gd.isEstimated && gd.scoresAsOf) {
+        const asOf = new Date(gd.scoresAsOf);
+        const timeStr = asOf.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+        const dateStr = asOf.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        html += `<p style="margin-bottom:8px;"><span style="background:#fdcb6e;color:#000;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">⚡ LIVE — scores as of ${timeStr}, ${dateStr}</span></p>`;
+      } else if (gd.isLive) {
+        html += `<p style="margin-bottom:8px;"><span style="background:#fdcb6e;color:#000;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">⚡ LIVE</span></p>`;
+      }
+
+      html += `<p class="subtitle" style="margin-bottom:6px;">🏆 Best: <strong style="color:${colorMap[best.name] || '#fff'}">${best.name}</strong> (${best.gdPts} pts) &nbsp;|&nbsp; Lowest: <strong style="color:${colorMap[worst.name] || '#fff'}">${worst.name}</strong> (${worst.gdPts} pts)</p>`;
       if (boosterUsers.length > 0) {
         const boosterSummary = boosterUsers.map(e => `<strong style="color:${colorMap[e.name] || '#fff'}">${e.name}</strong> used ${boosterLabel(e.boosterId)}`).join(' &nbsp;|&nbsp; ');
         html += `<p class="subtitle" style="margin-bottom:6px;">🔥 Boosters: ${boosterSummary}</p>`;
