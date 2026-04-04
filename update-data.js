@@ -77,8 +77,8 @@
   // │ These are calculated SEPARATELY from league standings points.       │
   // │                                                                     │
   // │ Current interpretation (B):                                         │
-  // │   FREE_HIT:        Total match gamedayPoints (whole team counts)    │
-  // │   WILD_CARD:       Total match gamedayPoints (whole team counts)    │
+  // │   FREE_HIT:        Total match gamedayPoints (squad flexibility)    │
+  // │   WILD_CARD:       Total match gamedayPoints (squad flexibility)    │
   // │   DOUBLE_POWER:    All players' points × 2 (full doubled amount)   │
   // │   TRIPLE_CAPTAIN:  Captain base pts × 3 (full tripled amount)      │
   // │   FOREIGN_STARS:   Foreign players' effective pts × 2 only         │
@@ -97,11 +97,13 @@
   //
   // Booster IDs are mapped as discovered. Unknown IDs fall back to total match points.
   const BOOSTER_TYPE = {
-    // 11: 'FREE_HIT',  ← confirmed
-    // Others: update as discovered
+    3: 'DOUBLE_POWER',
+    9: 'FOREIGN_STARS',
+    10: 'INDIAN_WARRIORS',
+    11: 'FREE_HIT',
+    12: 'TRIPLE_CAPTAIN',
+    // WILD_CARD: ID not yet seen (1 use available)
   };
-  // Start with what we know
-  BOOSTER_TYPE[11] = 'FREE_HIT';
 
   const WHOLE_TEAM_BOOSTERS = ['FREE_HIT', 'WILD_CARD', 'DOUBLE_POWER'];
 
@@ -289,7 +291,13 @@
     for (const gd of gamedayIds) {
       const pm = td?.perMatch?.[gd];
       if (pm?.boosterId) {
-        const bType = BOOSTER_TYPE[pm.boosterId] || 'UNKNOWN';
+        let bType = BOOSTER_TYPE[pm.boosterId];
+        if (!bType) {
+          // All other IDs are mapped — any unknown must be WILD_CARD
+          bType = 'WILD_CARD';
+          BOOSTER_TYPE[pm.boosterId] = 'WILD_CARD';
+          ok(`  🃏 Discovered WILD_CARD! Booster ID ${pm.boosterId} auto-mapped.`);
+        }
         boosterMatches.push({ teamName: m.teamName, gd, boosterId: pm.boosterId, boosterType: bType });
         boosterGds.add(gd);
         log(`  ${m.teamName} used booster ${pm.boosterId} (${bType}) in GD${gd}`);

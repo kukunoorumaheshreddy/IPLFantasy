@@ -115,8 +115,8 @@ Each team gets **6 booster types (10 total uses)** across the tournament. When a
 
 | Booster | What It Does | Uses |
 |---------|-------------|------|
-| 🎯 **FREE_HIT** | Your entire team's points are doubled for this match | 1 |
-| 🃏 **WILD_CARD** | Same as Free Hit — full team doubled | 1 |
+| 🎯 **FREE_HIT** | Change your entire team for one match (reverts after) | 1 |
+| 🃏 **WILD_CARD** | Same as Free Hit — change team freely for one match | 1 |
 | ⚡ **DOUBLE_POWER** | Full team doubled (similar to Free Hit) | 2 |
 | 👑 **TRIPLE_CAPTAIN** | Your captain scores ×3 instead of the usual ×2 | 2 |
 | 🌍 **FOREIGN_STARS** | All overseas players in your team score double | 2 |
@@ -131,7 +131,7 @@ Each team gets **6 booster types (10 total uses)** across the tournament. When a
 
 | Booster | Effect | Bonus Calculation |
 |---------|--------|-------------------|
-| **FREE_HIT** | Entire team scores double | All players' effective pts × 2 (total match doubled) |
+| **FREE_HIT** | Change entire team for one match | Total match gamedayPoints (squad flexibility benefit) |
 | **WILD_CARD** | Same as FREE_HIT | Same as FREE_HIT |
 | **DOUBLE_POWER** | Entire team scores double | All players' effective pts × 2 |
 | **TRIPLE_CAPTAIN** | Captain scores triple instead of double | Captain's pts × 3 (instead of × 2) |
@@ -173,14 +173,14 @@ The IPL Fantasy API uses numeric IDs for boosters (e.g., `11` = FREE_HIT). We've
 
 | Booster ID | Type |
 |-----------|------|
+| 3 | DOUBLE_POWER ✅ |
+| 9 | FOREIGN_STARS ✅ |
+| 10 | INDIAN_WARRIORS ✅ |
 | 11 | FREE_HIT ✅ |
+| 12 | TRIPLE_CAPTAIN ✅ |
 | ? | WILD_CARD (not yet seen) |
-| ? | DOUBLE_POWER (not yet seen) |
-| ? | TRIPLE_CAPTAIN (not yet seen) |
-| ? | FOREIGN_STARS (not yet seen) |
-| ? | INDIAN_WARRIORS (not yet seen) |
 
-This table will fill in as the tournament progresses and more boosters are used.
+Only WILD_CARD remains unmapped — it has 1 use and no one has activated it yet.
 
 ---
 

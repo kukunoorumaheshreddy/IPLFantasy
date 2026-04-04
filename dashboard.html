@@ -493,17 +493,16 @@
     ];
 
     const BOOSTER_NAMES = {
+      3: '⚡ Double Power',
+      9: '🌍 Foreign Stars',
+      10: '🇮🇳 Indian Warriors',
       11: '🎯 Free Hit',
-      // IDs below are placeholders — update when discovered
-      1: '⚡ Double Power',
-      2: '🌍 Foreign Stars',
-      3: '🇮🇳 Indian Warriors',
-      4: '👑 Triple Captain',
-      5: '🃏 Wild Card',
+      12: '👑 Triple Captain',
+      // WILD_CARD ID not yet seen — any unknown ID shows as 🃏 Wild Card
     };
     function boosterLabel(id) {
       if (!id) return null;
-      return BOOSTER_NAMES[id] || `🔮 Booster #${id}`;
+      return BOOSTER_NAMES[id] || `🃏 Wild Card`;
     }
 
     let rawData = null;
