@@ -4,16 +4,18 @@
 // Uses overall-get API + targeted gamedayplayers fetch for
 // booster matches only. Calculates booster-attributed points.
 //
-// Downloads ONE file:
-//   ipl-fantasy-v2-master-gdN.json
+// Outputs: ipl-fantasy-v2-master-gdN.json
 //
 // HOW TO USE:
 //   1. Go to fantasy.iplt20.com and LOG IN
 //   2. Open DevTools (F12) → Console
 //   3. Paste this entire script → Enter
-//   4. Wait ~30-60 seconds
-//   5. Save the JSON file into master-snapshots/ folder
-//   6. Save to master-snapshots/ folder under v2/
+//   4. Script fetches data, uploads to JSONBin, and repeats every 5 min
+//   5. Dashboard auto-reads from JSONBin on refresh
+//   6. Close the tab to stop polling
+//
+// FIRST RUN: You'll be prompted for your JSONBin API key (stored in localStorage).
+// To reset: localStorage.removeItem('jsonbin_key')
 // ============================================================
 
 (async () => {
@@ -22,6 +24,17 @@
   const HEADERS = { "entity": "d3tR0!t5m@sh" };
   const DELAY_MS = 300;
   const PHASE_ID = 1;
+  const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+  // ── JSONBin config ──
+  const JSONBIN_BIN_ID = "69d137a6aaba882197c4a0cb";
+  const JSONBIN_API = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+  let JSONBIN_KEY = localStorage.getItem("jsonbin_key");
+  if (!JSONBIN_KEY) {
+    JSONBIN_KEY = prompt("Enter your JSONBin X-Master-Key (one-time setup):");
+    if (JSONBIN_KEY) localStorage.setItem("jsonbin_key", JSONBIN_KEY);
+    else { console.error("No JSONBin key provided. Aborting."); return; }
+  }
 
   const log = (msg) => console.log(`%c[Update-v3] ${msg}`, "color: #6c5ce7; font-weight: bold;");
   const ok = (msg) => console.log(`%c[Update-v3] ${msg}`, "color: #00b894; font-weight: bold;");
@@ -41,6 +54,19 @@
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function uploadToJsonBin(data) {
+    const resp = await fetch(JSONBIN_API, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": JSONBIN_KEY,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!resp.ok) throw new Error(`JSONBin upload failed: ${resp.status} ${resp.statusText}`);
+    return resp.json();
   }
 
   // ── Booster definitions ──
@@ -78,6 +104,9 @@
   BOOSTER_TYPE[11] = 'FREE_HIT';
 
   const WHOLE_TEAM_BOOSTERS = ['FREE_HIT', 'WILD_CARD', 'DOUBLE_POWER'];
+
+  // ── Main extraction function (called each poll cycle) ──
+  async function runExtraction() {
 
   // ── 1. Get fixtures ──
   log("Fetching fixtures...");
@@ -496,13 +525,62 @@
     log(`    ${i + 1}. ${m.teamName}: ${m.totalBoosterPoints} booster pts (${m.boosterCount} boosters used)`);
   });
 
-  // ── 9. Download ──
+  // ── 9. Upload to JSONBin ──
   const latestGdId = gamedayIds[gamedayIds.length - 1];
   const apiCalls = 2 + members.length + boosterGds.size;
-  downloadJSON(output, `ipl-fantasy-v2-master-gd${latestGdId}.json`);
 
-  ok(`\n✅ Done! Downloaded: ipl-fantasy-v2-master-gd${latestGdId}.json`);
-  ok(`   ${gamedayIds.length} matches, ${members.length} members, ${boosterMatches.length} booster usages`);
+  try {
+    log("Uploading to JSONBin...");
+    await uploadToJsonBin(output);
+    ok(`✅ Uploaded to JSONBin successfully!`);
+  } catch (e) {
+    warn(`JSONBin upload failed: ${e.message}`);
+    warn("Falling back to file download...");
+    downloadJSON(output, `ipl-fantasy-v2-master-gd${latestGdId}.json`);
+  }
+
+  ok(`\n✅ Done! ${gamedayIds.length} matches, ${members.length} members, ${boosterMatches.length} booster usages`);
   ok(`   ${apiCalls} API calls (${boosterGds.size} extra for booster player data)`);
-  ok(`   Save to v2/master-snapshots/ and refresh dashboard.`);
+
+  return output;
+  } // end runExtraction
+
+  // ── Polling loop ──
+  let runCount = 0;
+  async function poll() {
+    runCount++;
+    log(`\n${"═".repeat(50)}`);
+    log(`🔄 Run #${runCount} — ${new Date().toLocaleTimeString()}`);
+    log(`${"═".repeat(50)}`);
+    try {
+      window._lastOutput = await runExtraction();
+    } catch (e) {
+      warn(`❌ Run #${runCount} failed: ${e.message}`);
+      console.error(e);
+    }
+    const nextTime = new Date(Date.now() + POLL_INTERVAL_MS);
+    ok(`⏳ Next update at ${nextTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Close tab to stop.`);
+    ok(`   Tip: Type stopPolling() to stop without closing the tab.`);
+    window._pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
+  }
+
+  // Allow manual stop
+  window.stopPolling = () => { clearTimeout(window._pollTimer); ok("🛑 Polling stopped."); };
+  // Allow manual file download of last data
+  window.downloadLastData = () => {
+    const data = window._lastOutput;
+    if (!data) { warn("No data yet."); return; }
+    const gdId = data.gamedays[data.gamedays.length - 1]?.gamedayId || "unknown";
+    downloadJSON(data, `ipl-fantasy-v2-master-gd${gdId}.json`);
+    ok(`Downloaded ipl-fantasy-v2-master-gd${gdId}.json`);
+  };
+
+  // First run immediately, then poll
+  const firstResult = await runExtraction().catch(e => { warn(`First run failed: ${e.message}`); console.error(e); });
+  window._lastOutput = firstResult;
+
+  const nextTime = new Date(Date.now() + POLL_INTERVAL_MS);
+  ok(`⏳ Next update at ${nextTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Close tab to stop.`);
+  ok(`   Type stopPolling() to stop, downloadLastData() to save file.`);
+  window._pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
 })();

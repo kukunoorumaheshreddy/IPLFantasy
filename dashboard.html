@@ -247,6 +247,7 @@
     @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
     @keyframes swing { 0% { transform: rotate(-30deg); } 50% { transform: rotate(30deg); } 100% { transform: rotate(-30deg); } }
     @keyframes fadeInOut { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+    @keyframes liveNotePulse { 0%,100% { background:rgba(253,203,110,0.1); } 50% { background:rgba(253,203,110,0.35); } }
     .cricket-loader { display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 0;gap:24px; }
     .cricket-scene { position:relative;width:200px;height:120px; }
     .cricket-ball { position:absolute;left:50%;top:50%;margin-left:-20px;margin-top:-20px;width:40px;height:40px;background:radial-gradient(circle at 35% 35%, #e74c3c, #c0392b);border-radius:50%;box-shadow:0 4px 15px rgba(231,76,60,0.4);animation:bounce 0.8s ease-in-out infinite; }
@@ -394,9 +395,9 @@
 
       <!-- View Tabs -->
       <div class="view-tabs">
-        <button class="view-tab active" data-view="table" onclick="switchView('table')">Standings</button>
+        <button class="view-tab" data-view="table" onclick="switchView('table')">Standings</button>
         <button class="view-tab" data-view="prizes" onclick="switchView('prizes')">Prizes</button>
-        <button class="view-tab" data-view="matchLb" onclick="switchView('matchLb')">Per-Match Leaderboard</button>
+        <button class="view-tab active" data-view="matchLb" onclick="switchView('matchLb')">Per-Match Leaderboard</button>
         <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
         <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
         <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
@@ -414,7 +415,7 @@
 
       <!-- Points Chart -->
       <!-- Table View -->
-      <div class="table-section" id="tableView">
+      <div class="table-section" id="tableView" style="display:none;">
         <h3 id="standingsHeading" style="margin-bottom:4px;">Current Standings</h3>
         <div id="standingsTable" style="overflow-x:auto;"></div>
       </div>
@@ -426,7 +427,7 @@
       </div>
 
       <!-- Per-Match Leaderboard -->
-      <div id="matchLbView" style="display:none;">
+      <div id="matchLbView">
         <div class="table-section">
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
             <h3 style="margin:0;">Per-Match Leaderboard</h3>
@@ -552,12 +553,37 @@
     }
 
     // ---- Auto-load: try master-snapshots/ipl-fantasy-v2-master-gdN.json from high to low ----
+    const JSONBIN_BIN_ID = "69d137a6aaba882197c4a0cb";
+    const JSONBIN_READ_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`;
+
     (async function autoLoad() {
       const statusEl = document.getElementById('autoLoadStatus');
       const loadStart = Date.now();
       const MIN_SPLASH_MS = 2500; // Show cricket animation for at least 2.5 seconds
 
-      // Try gd70 down to gd1 (IPL has max 70 matches)
+      // Try JSONBin first (live cloud data)
+      try {
+        statusEl.textContent = 'Checking for live data...';
+        const jbRes = await fetch(JSONBIN_READ_URL);
+        if (jbRes.ok) {
+          const jbJson = await jbRes.json();
+          const data = jbJson.record || jbJson;
+          if (data && data.gamedays && data.gamedays.length > 0) {
+            currentFileName = `JSONBin (live) — ${data.gamedays.length} matches`;
+            const elapsed = Date.now() - loadStart;
+            if (elapsed < MIN_SPLASH_MS) await new Promise(r => setTimeout(r, MIN_SPLASH_MS - elapsed));
+            statusEl.style.display = 'none';
+            processData(data);
+            console.log(`[Dashboard] Loaded from JSONBin (${data.gamedays.length} matches, extracted ${data.extractedAt})`);
+            return;
+          }
+        }
+      } catch (e) {
+        console.log('[Dashboard] JSONBin unavailable, falling back to repo files:', e.message);
+      }
+
+      // Fallback: try repo files gd70 down to gd1
+      statusEl.textContent = 'Loading from snapshots...';
       for (let gd = 70; gd >= 1; gd--) {
         const filename = `master-snapshots/ipl-fantasy-v2-master-gd${gd}.json`;
         try {
@@ -583,6 +609,32 @@
       console.log('[Dashboard] No snapshot files found in master-snapshots/. Showing manual upload.');
     })();
 
+    // ---- Auto-refresh from JSONBin every 60 seconds ----
+    const DASHBOARD_REFRESH_MS = 60 * 1000;
+    let autoRefreshTimer = null;
+
+    function startAutoRefresh() {
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      autoRefreshTimer = setInterval(async () => {
+        try {
+          const res = await fetch(JSONBIN_READ_URL);
+          if (!res.ok) return;
+          const jbJson = await res.json();
+          const data = jbJson.record || jbJson;
+          if (data && data.gamedays && data.gamedays.length > 0) {
+            // Only refresh if data actually changed
+            if (data.extractedAt !== rawData?.extractedAt) {
+              currentFileName = `JSONBin (live) — ${data.gamedays.length} matches`;
+              processData(data);
+              console.log(`[Dashboard] Auto-refreshed from JSONBin (${data.extractedAt})`);
+            }
+          }
+        } catch (e) {
+          console.log('[Dashboard] Auto-refresh failed:', e.message);
+        }
+      }, DASHBOARD_REFRESH_MS);
+    }
+
     // ---- Switch file handler ----
     document.getElementById('switchFileInput').addEventListener('change', (e) => {
       if (e.target.files[0]) readFile(e.target.files[0]);
@@ -595,7 +647,12 @@
       document.getElementById('uploadSection').style.display = 'none';
       document.getElementById('autoLoadStatus').style.display = 'none';
       document.getElementById('dashboard').classList.add('visible');
-      document.getElementById('loadedFile').textContent = currentFileName + ` (${data.gamedays?.length || 0} matches)`;
+      let fileLabel = currentFileName + ` (${data.gamedays?.length || 0} matches)`;
+      if (data.extractedAt) {
+        const ext = new Date(data.extractedAt);
+        fileLabel += ` · Updated ${ext.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}`;
+      }
+      document.getElementById('loadedFile').textContent = fileLabel;
 
       // Split into completed vs live/estimated gamedays
       const allGamedays = data.gamedays.sort((a, b) => a.gamedayId - b.gamedayId);
@@ -687,6 +744,9 @@
       renderHeatmap(labels, gamedays, members, matchDetails);
       initRace(gamedays, members, matchDetails);
       renderPtsAnimChart(labels, members, matchDetails);
+
+      // Start auto-refresh from JSONBin (if loaded from cloud)
+      if (currentFileName.includes('JSONBin')) startAutoRefresh();
     }
 
     function renderStats(gamedays, members, liveCount) {
@@ -724,10 +784,12 @@
         if (!noteEl) {
           noteEl = document.createElement('div');
           noteEl.id = 'liveNote';
-          noteEl.style.cssText = 'text-align:center;padding:6px 16px;margin:-4px auto 12px;font-size:12px;color:#fdcb6e;max-width:700px;';
+          noteEl.style.cssText = 'text-align:center;padding:10px 20px;margin:4px auto 16px;font-size:14px;color:#fdcb6e;background:rgba(253,203,110,0.1);border:1px solid rgba(253,203,110,0.3);border-radius:8px;white-space:nowrap;';
           document.getElementById('statsRow').after(noteEl);
         }
         noteEl.innerHTML = '⚡ Live match scores are estimated and shown only in <b>Per-Match Leaderboard</b>. All other tabs use completed matches only.';
+        noteEl.style.animation = 'liveNotePulse 0.8s ease-in-out 6';
+        setTimeout(() => { noteEl.style.animation = ''; }, 5000);
       } else if (noteEl) {
         noteEl.remove();
       }
