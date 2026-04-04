@@ -17,9 +17,9 @@ A live visualization dashboard for our IPL Fantasy league (League #6200104, 12 t
 
 ---
 
-## After Each Match (The Only Required Step)
+## How to Update Scores (The Only Required Step)
 
-Do this **once points are finalized** — usually 30–60 min after the match ends.
+Run this **once when a match starts** (or any time during a match). The script auto-updates every 5 minutes — no need to re-run.
 
 ### Step 1: Log in to the fantasy site
 
@@ -35,24 +35,33 @@ Press `F12` (or right-click → Inspect), then click the **Console** tab.
 
 Open [`update-data.js`](https://github.com/kukunoorumaheshreddy/IPLFantasy/blob/main/update-data.js), copy the **entire file**, paste it into the console, and press **Enter**.
 
-### Step 4: Wait ~30–60 seconds
+### Step 4: Enter your JSONBin API key (first time only)
 
-The script fetches data for all 12 league members across all completed matches. You'll see progress in the console.
+On your first run, a prompt will ask for the **JSONBin X-Master-Key**. Paste the key (ask Mahesh if you don't have it). It's saved in your browser's localStorage — you won't be asked again.
 
-When done, a **Save File dialog** will appear with the filename `ipl-fantasy-v2-master-gd{N}.json`.
+> To reset: type `localStorage.removeItem('jsonbin_key')` in the console.
 
-### Step 5: Save the file to the repo
+### Step 5: Leave the tab open
 
-Save (or move) the file directly into the `master-snapshots/` folder in your local clone of this repo. **Make sure the gameday number (gdN) in the filename is correct** — it should match the latest completed match.
+The script will:
+1. Fetch data for all 12 league members across all matches (~30-60 seconds)
+2. **Upload to JSONBin** automatically (no file download needed!)
+3. **Repeat every 5 minutes** until you close the tab
 
-Then push to GitHub:
-```bash
-git add master-snapshots/
-git commit -m "Match N data"
-git push
+You'll see a log like:
+```
+✅ Uploaded to JSONBin successfully!
+⏳ Next update at 4:25:30 PM. Close tab to stop.
 ```
 
-> 💡 If you don't have git access, just send the JSON file to Mahesh — he'll upload it.
+The dashboard auto-refreshes every 60 seconds and picks up the latest data. **No git push needed!**
+
+### Console commands
+
+| Command | What it does |
+|---------|-------------|
+| `stopPolling()` | Stop auto-updates without closing the tab |
+| `downloadLastData()` | Download the latest JSON as a file (backup) |
 
 ---
 
@@ -60,8 +69,7 @@ git push
 
 | When | What | How | Required? |
 |------|------|-----|-----------|
-| After each match | Pull latest data | Paste `update-data.js` in console | ✅ Yes |
-| After download | Save to repo | Save into `master-snapshots/` + git push | ✅ Yes |
+| Match starts | Start live updates | Paste `update-data.js` in console, leave tab open | ✅ Yes |
 | Any time | View dashboard | [Open dashboard](https://kukunoorumaheshreddy.github.io/IPLFantasy/dashboard.html) | — |
 
 ---
@@ -74,25 +82,30 @@ You're not logged in. Go to [fantasy.iplt20.com](https://fantasy.iplt20.com/clas
 ### Chrome says "Don't paste code you don't understand"
 Type `allow pasting` in the console and press Enter. Then paste the script.
 
-### Script seems stuck / no download after 2 minutes
-Check the console for red errors. Most likely your session expired — refresh the page, log in again, then re-paste the script.
+### JSONBin upload failed
+Check the console for the error. Most likely your API key is wrong — type `localStorage.removeItem('jsonbin_key')` and re-run the script to re-enter it.
+
+### Script stops updating / red errors after a while
+Your fantasy session expired. Refresh the page, log in again, and re-paste the script.
 
 ### Dashboard shows "No data loaded"
-The JSON file hasn't been pushed to the repo yet. Make sure the file is in the `master-snapshots/` folder and pushed to GitHub.
+No one has run the script recently. Either run `update-data.js` yourself, or check if there are snapshot files in `master-snapshots/` (the dashboard falls back to these).
 
 ### Points look slightly different from the fantasy app
-The script accounts for boosters (power-ups), but some edge cases may cause small differences. These are cosmetic and don't affect rankings.
+Live match scores are estimated from player data. Once a match is finalized, the official scores replace the estimates automatically on the next script run.
 
 ---
 
 ## How It Works
 
 ### update-data.js
-1. Fetches the IPL match schedule to find all completed matches
+1. Fetches the IPL match schedule to find all completed and live matches
 2. For each league member: calls the `overall-get` API to get all match data in one shot
-3. Detects booster usage (FREE_HIT, DOUBLE_POWER, etc.) and calculates bonus points
-4. Builds cumulative rankings, transfer usage, and per-match breakdowns
-5. Downloads one self-contained JSON file with everything
+3. For live matches: calculates scores from player data, filtering by teams playing in each fixture
+4. Detects booster usage (FREE_HIT, DOUBLE_POWER, etc.) and calculates bonus points
+5. Builds cumulative rankings, transfer usage, and per-match breakdowns
+6. **Uploads the JSON to JSONBin** (cloud storage) — no file download needed
+7. **Repeats every 5 minutes** until the tab is closed
 
 ### Booster Calculation
 
@@ -136,7 +149,7 @@ The IPL Fantasy API provides an `IS_FP` (Is Foreign Player) field in the live pl
 This is used by the FOREIGN_STARS and INDIAN_WARRIORS boosters to determine which players get doubled. The script fetches the player data feed only for matches where these nationality-based boosters were activated (to minimize API calls).
 
 ### Dashboard
-Pure HTML + JavaScript — no server, no install. Hosted free on GitHub Pages. Auto-loads the latest JSON from the `master-snapshots/` folder.
+Pure HTML + JavaScript — no server, no install. Hosted free on GitHub Pages. Auto-loads data from JSONBin (live cloud data), falls back to `master-snapshots/` repo files if JSONBin is unavailable. **Auto-refreshes every 60 seconds** when loaded from JSONBin.
 
 ---
 
