@@ -651,6 +651,12 @@
       if (data.extractedAt) {
         const ext = new Date(data.extractedAt);
         fileLabel += ` · Updated ${ext.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}`;
+        // Show next update time (15 min from extraction)
+        const nextUpdate = new Date(ext.getTime() + 15 * 60 * 1000);
+        const now = new Date();
+        if (nextUpdate > now) {
+          fileLabel += ` · Next update ~${nextUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}`;
+        }
       }
       document.getElementById('loadedFile').textContent = fileLabel;
 

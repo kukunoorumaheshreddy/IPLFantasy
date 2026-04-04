@@ -24,7 +24,7 @@
   const HEADERS = { "entity": "d3tR0!t5m@sh" };
   const DELAY_MS = 300;
   const PHASE_ID = 1;
-  const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+  const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
   // ── JSONBin config ──
   const JSONBIN_BIN_ID = "69d137a6aaba882197c4a0cb";
