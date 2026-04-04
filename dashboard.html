@@ -665,6 +665,9 @@
       const completedGamedays = allGamedays.filter(gd => !gd.isEstimated && !gd.isLive);
       const liveGamedays = allGamedays.filter(gd => gd.isEstimated || gd.isLive);
 
+      // Build set of completed gameday IDs for filtering
+      const completedGdIds = new Set(completedGamedays.map(gd => gd.gamedayId));
+
       // Use only completed gamedays for aggregations (standings, prizes, rank, race, heatmap)
       const gamedays = completedGamedays;
       const memberMap = {};// teamName -> { ranks:[], points:[], gdPoints:[], boosters:[], subsUsed:null, subsTotal:null }
@@ -741,7 +744,7 @@
 
       // Tables
       renderTable(gamedays, members);
-      renderPrizes(gamedays, members, data);
+      renderPrizes(gamedays, members, data, completedGdIds);
 
       // Per-match leaderboard gets ALL gamedays (including live)
       renderMatchLeaderboard(allGamedays, members);
@@ -1286,7 +1289,7 @@
     }
 
     // ---- Prizes ----
-    function renderPrizes(gamedays, members, data) {
+    function renderPrizes(gamedays, members, data, completedGdIds) {
       const CARD = 'background:linear-gradient(135deg,#2a2d3a,#1a1d28);border:1px solid var(--border);border-radius:12px;padding:16px;';
       const MEDAL = ['🥇','🥈','🥉'];
       const memberColorMap = {};
@@ -1295,14 +1298,17 @@
       const allMembers = members;
       const leaderPts = allMembers[0]?.[1].points.filter(p => p != null).pop() || 0;
 
-      // Booster ranking
+      // Booster ranking — only count completed matches
       const boosterRanking = (data.members || [])
-        .map(m => ({
-          name: m.teamName,
-          totalBoosterPts: m.totalBoosterPoints || 0,
-          boosterCount: m.boosterCount || 0,
-          details: m.boosterDetails || [],
-        }))
+        .map(m => {
+          const completedDetails = (m.boosterDetails || []).filter(b => completedGdIds.has(b.gd));
+          return {
+            name: m.teamName,
+            totalBoosterPts: completedDetails.reduce((s, b) => s + (b.boosterPoints || 0), 0),
+            boosterCount: completedDetails.length,
+            details: completedDetails,
+          };
+        })
         .sort((a, b) => b.totalBoosterPts - a.totalBoosterPts);
 
       // Playoff ranking
