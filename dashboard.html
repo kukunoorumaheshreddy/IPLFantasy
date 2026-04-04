@@ -128,7 +128,7 @@
     .heatmap-table { border-collapse: collapse; font-size: 13px; width: 100%; }
     .heatmap-table th, .heatmap-table td { padding: 6px 10px; text-align: center; white-space: nowrap; border: 1px solid var(--border); }
     .heatmap-table th { background: var(--bg); color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
-    .heatmap-table td.hm-team { text-align: left; font-weight: 600; background: var(--surface); position: sticky; left: 0; z-index: 1; min-width: 150px; border-right: 2px solid var(--border); }
+    .heatmap-table td.hm-team { text-align: left; font-weight: 600; background: var(--surface); position: sticky; left: 0; z-index: 1; min-width: 220px; border-right: 2px solid var(--border); }
     .heatmap-table th:first-child { position: sticky; left: 0; z-index: 2; background: var(--bg); }
     .hm-cell { font-weight: 700; font-size: 13px; min-width: 42px; }
 
@@ -1406,7 +1406,7 @@
         return `rgb(${r},${g},${b})`;
       }
 
-      let html = '<p style="font-size:11px;opacity:0.5;margin-bottom:8px;">TL = Transfers Left · BU = Boosters Used · 🔥 = Booster active this match</p>';
+      let html = '<p style="font-size:12px;opacity:0.9;margin-bottom:8px;">TL = Transfers Left · BU = Boosters Used · 🔥 = Booster active this match</p>';
       html += '<table class="heatmap-table"><thead><tr><th>Team</th>';
       labels.forEach((lbl, i) => {
         const md = matchDetails[i];
@@ -1418,7 +1418,7 @@
         const color = COLORS[mi % COLORS.length];
         const boosterCount = (data.boosters || []).filter(b => b != null).length;
         const subsInfo = data.subsLeft != null ? data.subsLeft : '—';
-        html += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name} <span style="font-size:10px;opacity:0.5;">TL=${subsInfo}, BU=${boosterCount}</span></td>`;
+        html += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name} <span style="font-size:11px;opacity:0.5;margin-left:8px;">TL=${subsInfo}, BU=${boosterCount}</span></td>`;
         data.ranks.forEach((rank, gi) => {
           const bid = data.boosters ? data.boosters[gi] : null;
           const boosterTip = bid ? ` — ${boosterLabel(bid)}` : '';
