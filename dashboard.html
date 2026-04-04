@@ -1406,7 +1406,8 @@
         return `rgb(${r},${g},${b})`;
       }
 
-      let html = '<table class="heatmap-table"><thead><tr><th>Team</th>';
+      let html = '<p style="font-size:11px;opacity:0.5;margin-bottom:8px;">TL = Transfers Left · BU = Boosters Used · 🔥 = Booster active this match</p>';
+      html += '<table class="heatmap-table"><thead><tr><th>Team</th>';
       labels.forEach((lbl, i) => {
         const md = matchDetails[i];
         html += `<th title="${md.name} (${md.date})">${lbl}</th>`;
@@ -1415,7 +1416,9 @@
 
       members.forEach(([name, data], mi) => {
         const color = COLORS[mi % COLORS.length];
-        html += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name}</td>`;
+        const boosterCount = (data.boosters || []).filter(b => b != null).length;
+        const subsInfo = data.subsLeft != null ? data.subsLeft : '—';
+        html += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name} <span style="font-size:10px;opacity:0.5;">TL=${subsInfo}, BU=${boosterCount}</span></td>`;
         data.ranks.forEach((rank, gi) => {
           const bid = data.boosters ? data.boosters[gi] : null;
           const boosterTip = bid ? ` — ${boosterLabel(bid)}` : '';
