@@ -1,18 +1,10 @@
 {
   "leagueId": 6200104,
   "leagueName": "Big Blue Championship",
-  "extractedAt": "2026-04-04T14:57:50.776Z",
+  "extractedAt": "2026-04-04T15:50:55.453Z",
   "dataVersion": 3,
   "totalGamedays": 9,
   "members": [
-    {
-      "teamName": "WindyCityWarriors",
-      "teamId": 91450807,
-      "socialId": "41538d2a-90f1-70b5-f12c-46c12e61d683",
-      "boosterCount": 0,
-      "boosterDetails": [],
-      "totalBoosterPoints": 0
-    },
     {
       "teamName": "AVB",
       "teamId": 116380210,
@@ -31,12 +23,20 @@
           "gd": 9,
           "boosterId": 11,
           "boosterType": "FREE_HIT",
-          "boosterPoints": 228,
-          "matchPoints": 228,
-          "details": "Total match pts: 228"
+          "boosterPoints": 305,
+          "matchPoints": 305,
+          "details": "Total match pts: 305"
         }
       ],
-      "totalBoosterPoints": 228
+      "totalBoosterPoints": 305
+    },
+    {
+      "teamName": "WindyCityWarriors",
+      "teamId": 91450807,
+      "socialId": "41538d2a-90f1-70b5-f12c-46c12e61d683",
+      "boosterCount": 0,
+      "boosterDetails": [],
+      "totalBoosterPoints": 0
     },
     {
       "teamName": "Master of Universe",
@@ -72,6 +72,14 @@
       "totalBoosterPoints": 0
     },
     {
+      "teamName": "Aaya Sher XI",
+      "teamId": 26900509,
+      "socialId": "51e3edea-8081-701f-32b1-290781d9e83d",
+      "boosterCount": 0,
+      "boosterDetails": [],
+      "totalBoosterPoints": 0
+    },
+    {
       "teamName": "Dakkhani Zaika",
       "teamId": 114990707,
       "socialId": "d1535dca-50f1-70b1-d63c-7eb5cddad6c4",
@@ -91,14 +99,6 @@
       "teamName": "Run2Win",
       "teamId": 36380907,
       "socialId": "11c3adba-a001-7063-fe91-9dbca9736dde",
-      "boosterCount": 0,
-      "boosterDetails": [],
-      "totalBoosterPoints": 0
-    },
-    {
-      "teamName": "Aaya Sher XI",
-      "teamId": 26900509,
-      "socialId": "51e3edea-8081-701f-32b1-290781d9e83d",
       "boosterCount": 0,
       "boosterDetails": [],
       "totalBoosterPoints": 0
@@ -1541,7 +1541,7 @@
       "matchDate": "2026-04-04",
       "isLive": true,
       "isEstimated": true,
-      "scoresAsOf": "2026-04-04T14:57:48.460Z",
+      "scoresAsOf": "2026-04-04T15:50:52.234Z",
       "leaderboard": [
         {
           "teamName": "AVB",
@@ -1743,30 +1743,14 @@
       "matchDate": "2026-04-04",
       "isLive": true,
       "isEstimated": true,
-      "scoresAsOf": "2026-04-04T14:57:49.275Z",
+      "scoresAsOf": "2026-04-04T15:50:53.548Z",
       "leaderboard": [
-        {
-          "teamName": "WindyCityWarriors",
-          "teamId": 91450807,
-          "userId": "41538d2a-90f1-70b5-f12c-46c12e61d683",
-          "gamedayPoints": 166,
-          "totalPoints": 2421,
-          "captain": "Yashasvi Jaiswal",
-          "viceCaptain": "Jos Buttler",
-          "boosterId": null,
-          "boosterPoints": null,
-          "subsUsed": 3,
-          "subsLeft": 137,
-          "subsThisMatch": 23,
-          "subsTotal": 160,
-          "rank": 1
-        },
         {
           "teamName": "AVB",
           "teamId": 116380210,
           "userId": "f1b3dd3a-10c1-70d8-22cf-5332363fa644",
-          "gamedayPoints": 133,
-          "totalPoints": 2408,
+          "gamedayPoints": 215.5,
+          "totalPoints": 2490.5,
           "captain": "Jos Buttler",
           "viceCaptain": "Yashasvi Jaiswal",
           "boosterId": null,
@@ -1775,21 +1759,37 @@
           "subsLeft": 137,
           "subsThisMatch": 23,
           "subsTotal": 160,
-          "rank": 2
+          "rank": 1
         },
         {
           "teamName": "Deccan Tifosi",
           "teamId": 116780402,
           "userId": "c1934dda-5001-7024-87d1-8a129e616a14",
-          "gamedayPoints": 228,
-          "totalPoints": 2388.5,
+          "gamedayPoints": 305,
+          "totalPoints": 2465.5,
           "captain": "Vaibhav Sooryavanshi",
           "viceCaptain": "Sai Sudharsan",
           "boosterId": 11,
-          "boosterPoints": 228,
+          "boosterPoints": 305,
           "subsUsed": 0,
           "subsLeft": 146,
           "subsThisMatch": 14,
+          "subsTotal": 160,
+          "rank": 2
+        },
+        {
+          "teamName": "WindyCityWarriors",
+          "teamId": 91450807,
+          "userId": "41538d2a-90f1-70b5-f12c-46c12e61d683",
+          "gamedayPoints": 188,
+          "totalPoints": 2443,
+          "captain": "Yashasvi Jaiswal",
+          "viceCaptain": "Jos Buttler",
+          "boosterId": null,
+          "boosterPoints": null,
+          "subsUsed": 3,
+          "subsLeft": 137,
+          "subsThisMatch": 23,
           "subsTotal": 160,
           "rank": 3
         },
@@ -1797,8 +1797,8 @@
           "teamName": "Master of Universe",
           "teamId": 115140405,
           "userId": "a1c32d0a-a0d1-7059-3ab9-5f82855fc1cd",
-          "gamedayPoints": 90,
-          "totalPoints": 2333,
+          "gamedayPoints": 162,
+          "totalPoints": 2405,
           "captain": "Jos Buttler",
           "viceCaptain": "Vaibhav Sooryavanshi",
           "boosterId": null,
@@ -1813,8 +1813,8 @@
           "teamName": "Karth Vader XI",
           "teamId": 13830904,
           "userId": "81831d5a-90c1-7077-f8bc-79277ee30694",
-          "gamedayPoints": 92,
-          "totalPoints": 2309.5,
+          "gamedayPoints": 117,
+          "totalPoints": 2334.5,
           "captain": "Riyan Parag",
           "viceCaptain": "Sai Sudharsan",
           "boosterId": null,
@@ -1829,8 +1829,8 @@
           "teamName": "Chi Team",
           "teamId": 35560808,
           "userId": "2153ad5a-60f1-7010-bf66-eedb2bc23202",
-          "gamedayPoints": 164,
-          "totalPoints": 2278.5,
+          "gamedayPoints": 169,
+          "totalPoints": 2283.5,
           "captain": "Sai Sudharsan",
           "viceCaptain": "Vaibhav Sooryavanshi",
           "boosterId": null,
@@ -1842,11 +1842,27 @@
           "rank": 6
         },
         {
+          "teamName": "Aaya Sher XI",
+          "teamId": 26900509,
+          "userId": "51e3edea-8081-701f-32b1-290781d9e83d",
+          "gamedayPoints": 177.5,
+          "totalPoints": 2190.5,
+          "captain": "Jos Buttler",
+          "viceCaptain": "Ravindra Jadeja",
+          "boosterId": null,
+          "boosterPoints": null,
+          "subsUsed": 4,
+          "subsLeft": 137,
+          "subsThisMatch": 23,
+          "subsTotal": 160,
+          "rank": 7
+        },
+        {
           "teamName": "Dakkhani Zaika",
           "teamId": 114990707,
           "userId": "d1535dca-50f1-70b1-d63c-7eb5cddad6c4",
-          "gamedayPoints": 90,
-          "totalPoints": 2150.5,
+          "gamedayPoints": 113,
+          "totalPoints": 2173.5,
           "captain": "Sai Sudharsan",
           "viceCaptain": "Vaibhav Sooryavanshi",
           "boosterId": null,
@@ -1855,14 +1871,14 @@
           "subsLeft": 139,
           "subsThisMatch": 21,
           "subsTotal": 160,
-          "rank": 7
+          "rank": 8
         },
         {
           "teamName": "Aamchi Mumbhais",
           "teamId": 127320108,
           "userId": "f1c37d3a-00f1-7007-9321-3b5f7c9a4729",
-          "gamedayPoints": 130,
-          "totalPoints": 2129.5,
+          "gamedayPoints": 141,
+          "totalPoints": 2140.5,
           "captain": "Vaibhav Sooryavanshi",
           "viceCaptain": "Sai Sudharsan",
           "boosterId": null,
@@ -1871,7 +1887,7 @@
           "subsLeft": 132,
           "subsThisMatch": 28,
           "subsTotal": 160,
-          "rank": 8
+          "rank": 9
         },
         {
           "teamName": "Run2Win",
@@ -1886,22 +1902,6 @@
           "subsUsed": 2,
           "subsLeft": 138,
           "subsThisMatch": 22,
-          "subsTotal": 160,
-          "rank": 9
-        },
-        {
-          "teamName": "Aaya Sher XI",
-          "teamId": 26900509,
-          "userId": "51e3edea-8081-701f-32b1-290781d9e83d",
-          "gamedayPoints": 96,
-          "totalPoints": 2109,
-          "captain": "Jos Buttler",
-          "viceCaptain": "Ravindra Jadeja",
-          "boosterId": null,
-          "boosterPoints": null,
-          "subsUsed": 4,
-          "subsLeft": 137,
-          "subsThisMatch": 23,
           "subsTotal": 160,
           "rank": 10
         },
@@ -1925,8 +1925,8 @@
           "teamName": "Faaaaaaaahhhhhh",
           "teamId": 120330403,
           "userId": "c1831d3a-c0d1-706e-a840-44e35837244c",
-          "gamedayPoints": 60,
-          "totalPoints": 1951.5,
+          "gamedayPoints": 124,
+          "totalPoints": 2015.5,
           "captain": "Ryan Rickelton",
           "viceCaptain": "Axar Patel",
           "boosterId": null,
