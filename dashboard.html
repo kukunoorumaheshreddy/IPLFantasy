@@ -717,6 +717,20 @@
         <div class="stat-card"><div class="label">Best Single Match</div><div class="value">${bestMatch.pts}<span style="font-size:12px;color:var(--text-dim);display:block;">${bestMatch.name}</span><span style="font-size:11px;color:var(--text-dim);display:block;">${bestMatchLabel}</span></div></div>
       `;
       document.getElementById('statsRow').innerHTML = html;
+
+      // Show live match info note when there are live matches
+      let noteEl = document.getElementById('liveNote');
+      if (liveCount > 0) {
+        if (!noteEl) {
+          noteEl = document.createElement('div');
+          noteEl.id = 'liveNote';
+          noteEl.style.cssText = 'text-align:center;padding:6px 16px;margin:-4px auto 12px;font-size:12px;color:#fdcb6e;max-width:700px;';
+          document.getElementById('statsRow').after(noteEl);
+        }
+        noteEl.innerHTML = '⚡ Live match scores are estimated and shown only in <b>Per-Match Leaderboard</b>. All other tabs use completed matches only.';
+      } else if (noteEl) {
+        noteEl.remove();
+      }
     }
 
     function renderControls(members, containerId) {
@@ -1073,22 +1087,12 @@
       if (!gd) return;
       const colorMap = matchLbData.memberColorMap;
 
-      // Build previous match rank lookup
-      const prevRankMap = {};
-      if (gdIdx > 0) {
-        const prevGd = matchLbData.gamedays[gdIdx - 1];
-        prevGd.leaderboard.forEach(e => { prevRankMap[e.teamName || e.temname] = e.rank || 0; });
-      }
-
       const matchRanking = gd.leaderboard
         .map(entry => ({
           name: entry.teamName || entry.temname,
           gdPts: entry.gamedayPoints || 0,
-          totalPts: entry.totalPoints || entry.points || 0,
           captain: entry.captain || '—',
           viceCaptain: entry.viceCaptain || '—',
-          overallRank: entry.rank || 0,
-          prevRank: prevRankMap[entry.teamName || entry.temname] || null,
           boosterId: entry.boosterId || null,
         }))
         .sort((a, b) => b.gdPts - a.gdPts);
@@ -1114,23 +1118,14 @@
         const boosterSummary = boosterUsers.map(e => `<strong style="color:${colorMap[e.name] || '#fff'}">${e.name}</strong> used ${boosterLabel(e.boosterId)}`).join(' &nbsp;|&nbsp; ');
         html += `<p class="subtitle" style="margin-bottom:6px;">🔥 Boosters: ${boosterSummary}</p>`;
       }
-      html += `<p class="subtitle" style="margin-bottom:14px;font-size:12px;opacity:0.7;">Rank change is compared to previous match standings</p>`;
       html += `<table><thead><tr>`;
-      html += `<th>#</th><th>Team</th><th>Match Pts</th><th>Booster</th><th>Captain</th><th>Vice Captain</th><th>Overall Rank</th><th>Rank Change</th><th>Cumulative Pts</th>`;
+      html += `<th>#</th><th>Team</th><th>Match Pts</th><th>Booster</th><th>Captain</th><th>Vice Captain</th>`;
       html += `</tr></thead><tbody>`;
 
       matchRanking.forEach((entry, pos) => {
         const color = colorMap[entry.name] || '#8b8fa3';
         const medal = pos === 0 ? '🥇' : pos === 1 ? '🥈' : pos === 2 ? '🥉' : `${pos + 1}`;
         const barWidth = best.gdPts > 0 ? Math.round((entry.gdPts / best.gdPts) * 100) : 0;
-
-        let changeHtml = '<span class="rank-same">—</span>';
-        if (entry.prevRank != null) {
-          const diff = entry.prevRank - entry.overallRank;
-          if (diff > 0) changeHtml = `<span class="rank-up">▲${diff}</span>`;
-          else if (diff < 0) changeHtml = `<span class="rank-down">▼${Math.abs(diff)}</span>`;
-          else changeHtml = `<span class="rank-same">● 0</span>`;
-        }
 
         const boosterBadge = entry.boosterId
           ? `<span style="background:#ff9f43;color:#000;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">${boosterLabel(entry.boosterId)}</span>`
@@ -1150,9 +1145,6 @@
           <td style="text-align:center;">${boosterBadge}</td>
           <td style="font-size:12px;">${entry.captain}</td>
           <td style="font-size:12px;">${entry.viceCaptain}</td>
-          <td style="text-align:center;">#${entry.overallRank}</td>
-          <td style="text-align:center;">${changeHtml}</td>
-          <td>${entry.totalPts}</td>
         </tr>`;
       });
 

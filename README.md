@@ -8,10 +8,12 @@ A live visualization dashboard for our IPL Fantasy league (League #6200104, 12 t
 
 - **Standings** — current rankings with rank change from Match 1
 - **Prizes** — Top 3 Overall, Master of Boosters, Playoff Champion
-- **Per-Match Leaderboard** — drill into any individual match
+- **Per-Match Leaderboard** — drill into any individual match (including live)
 - **Rank Progression** — line chart showing rank over time
 - **Points Race** — animated bar chart race + line drawing animation (synced, side-by-side)
 - **Rank Heatmap** — color-coded rank grid across all matches
+
+> ⚠️ **Live matches** are only shown in the **Per-Match Leaderboard** tab. Standings, Prizes, Rank Progression, Points Race, and Heatmap use **completed matches only** — this avoids skewing aggregates with partial/estimated scores.
 
 ---
 
