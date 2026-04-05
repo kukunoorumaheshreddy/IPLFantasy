@@ -395,9 +395,9 @@
 
       <!-- View Tabs -->
       <div class="view-tabs">
-        <button class="view-tab" data-view="table" onclick="switchView('table')">Standings</button>
-        <button class="view-tab" data-view="prizes" onclick="switchView('prizes')">Prizes</button>
-        <button class="view-tab active" data-view="matchLb" onclick="switchView('matchLb')">Per-Match Leaderboard</button>
+        <button class="view-tab" data-view="table" id="tabStandings" onclick="switchView('table')">Standings</button>
+        <button class="view-tab" data-view="prizes" id="tabPrizes" onclick="switchView('prizes')">Prizes</button>
+        <button class="view-tab active" data-view="matchLb" id="tabMatchLb" onclick="switchView('matchLb')">Per-Match Leaderboard</button>
         <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
         <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
         <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
@@ -768,6 +768,12 @@
       renderHeatmap(labels, gamedays, members, matchDetails);
       initRace(gamedays, members, matchDetails);
       renderPtsAnimChart(labels, members, matchDetails);
+
+      // Update tab labels with * when live data present
+      const liveStar = liveGamedays.length > 0 ? '*' : '';
+      document.getElementById('tabStandings').textContent = 'Standings' + liveStar;
+      document.getElementById('tabPrizes').textContent = 'Prizes' + liveStar;
+      document.getElementById('tabMatchLb').textContent = 'Per-Match Leaderboard' + liveStar;
 
       // Start auto-refresh from JSONBin (if loaded from cloud)
       if (currentFileName.includes('JSONBin')) startAutoRefresh();
