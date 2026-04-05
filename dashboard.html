@@ -664,55 +664,72 @@
       const completedGamedays = allGamedays.filter(gd => !gd.isEstimated && !gd.isLive);
       const liveGamedays = allGamedays.filter(gd => gd.isEstimated || gd.isLive);
 
-      // Build set of completed gameday IDs for filtering
-      const completedGdIds = new Set(completedGamedays.map(gd => gd.gamedayId));
+      // Build set of all available gameday IDs (completed + live) for prizes
+      const allGdIds = new Set(allGamedays.map(gd => gd.gamedayId));
 
-      // Use only completed gamedays for aggregations (standings, prizes, rank, race, heatmap)
+      // Standings & Prizes include live matches; Charts/Heatmap use completed only
+      const standingsGamedays = allGamedays;
       const gamedays = completedGamedays;
-      const memberMap = {};// teamName -> { ranks:[], points:[], gdPoints:[], boosters:[], subsUsed:null, subsTotal:null }
 
-      gamedays.forEach((gd, idx) => {
-        const sorted = [...gd.leaderboard].sort((a, b) => {
-          const rA = a.rank || a.leagueRank || 999;
-          const rB = b.rank || b.leagueRank || 999;
-          return rA - rB;
+      // Helper: build memberMap from a gameday list
+      function buildMemberMap(gdList) {
+        const map = {};
+        gdList.forEach((gd, idx) => {
+          const sorted = [...gd.leaderboard].sort((a, b) => {
+            const rA = a.rank || a.leagueRank || 999;
+            const rB = b.rank || b.leagueRank || 999;
+            return rA - rB;
+          });
+          sorted.forEach((entry, pos) => {
+            const name = entry.teamName || entry.temname;
+            if (!map[name]) {
+              map[name] = { ranks: [], points: [], gdPoints: [], boosters: [], userId: entry.userId || entry.usrscoid };
+            }
+            const rank = entry.rank || entry.leagueRank || (pos + 1);
+            const pts = entry.totalPoints || entry.points || 0;
+            map[name].ranks.push(rank);
+            map[name].points.push(pts);
+            if (entry.gamedayPoints != null) {
+              map[name].gdPoints.push(entry.gamedayPoints);
+            } else {
+              const prevPts = map[name].points.length > 1 ? map[name].points[map[name].points.length - 2] : 0;
+              map[name].gdPoints.push(Math.round((pts - prevPts) * 100) / 100);
+            }
+            map[name].boosters.push(entry.boosterId || null);
+            if (entry.subsUsed != null) map[name].subsUsed = entry.subsUsed;
+            if (entry.subsLeft != null) map[name].subsLeft = entry.subsLeft;
+            if (entry.subsTotal != null) map[name].subsTotal = entry.subsTotal;
+            if (!map[name].subsPerMatch) map[name].subsPerMatch = [];
+            map[name].subsPerMatch.push(entry.subsThisMatch ?? null);
+          });
+          Object.keys(map).forEach((name) => {
+            if (map[name].ranks.length <= idx) {
+              map[name].ranks.push(null);
+              map[name].points.push(null);
+              map[name].gdPoints.push(null);
+              map[name].boosters.push(null);
+            }
+          });
         });
+        return map;
+      }
 
-        sorted.forEach((entry, pos) => {
-          const name = entry.teamName || entry.temname;
-          if (!memberMap[name]) {
-            memberMap[name] = { ranks: [], points: [], gdPoints: [], boosters: [], userId: entry.userId || entry.usrscoid };
-          }
-          const rank = entry.rank || entry.leagueRank || (pos + 1);
-          const pts = entry.totalPoints || entry.points || 0;
-          memberMap[name].ranks.push(rank);
-          memberMap[name].points.push(pts);
-          // Use gamedayPoints if available (v2), otherwise compute as diff
-          if (entry.gamedayPoints != null) {
-            memberMap[name].gdPoints.push(entry.gamedayPoints);
-          } else {
-            const prevPts = memberMap[name].points.length > 1 ? memberMap[name].points[memberMap[name].points.length - 2] : 0;
-            memberMap[name].gdPoints.push(Math.round((pts - prevPts) * 100) / 100);
-          }
-          memberMap[name].boosters.push(entry.boosterId || null);
-          // Track latest substitution data (cumulative, so last value wins)
-          if (entry.subsUsed != null) memberMap[name].subsUsed = entry.subsUsed;
-          if (entry.subsLeft != null) memberMap[name].subsLeft = entry.subsLeft;
-          if (entry.subsTotal != null) memberMap[name].subsTotal = entry.subsTotal;
-          // Track per-match subs
-          if (!memberMap[name].subsPerMatch) memberMap[name].subsPerMatch = [];
-          memberMap[name].subsPerMatch.push(entry.subsThisMatch ?? null);
+      function sortMembers(map) {
+        return Object.entries(map).sort((a, b) => {
+          const lastA = a[1].ranks.filter((r) => r != null).pop() || 999;
+          const lastB = b[1].ranks.filter((r) => r != null).pop() || 999;
+          return lastA - lastB;
         });
+      }
 
-        Object.keys(memberMap).forEach((name) => {
-          if (memberMap[name].ranks.length <= idx) {
-            memberMap[name].ranks.push(null);
-            memberMap[name].points.push(null);
-            memberMap[name].gdPoints.push(null);
-            memberMap[name].boosters.push(null);
-          }
-        });
-      });
+      // Build member data for completed gamedays (charts/heatmap/race)
+      const memberMap = buildMemberMap(gamedays);
+
+      // Build member data including live matches (standings/prizes)
+      const standingsMemberMap = buildMemberMap(standingsGamedays);
+
+      // For legacy code below — skip the old loop
+      // (memberMap is already built by buildMemberMap above)
 
       // Labels (x-axis) — show match number, keep match details for tooltips
       const labels = gamedays.map((gd) => `M${gd.gamedayId}`);
@@ -722,18 +739,17 @@
         return { name, date, gamedayId: gd.gamedayId };
       });
 
-      // Sort members by latest rank
-      const members = Object.entries(memberMap).sort((a, b) => {
-        const lastA = a[1].ranks.filter((r) => r != null).pop() || 999;
-        const lastB = b[1].ranks.filter((r) => r != null).pop() || 999;
-        return lastA - lastB;
-      });
+      // Sort members by latest rank (completed only — for charts/heatmap)
+      const members = sortMembers(memberMap);
+
+      // Sort standings members by latest rank (includes live)
+      const standingsMembers = sortMembers(standingsMemberMap);
 
       // Initialize all as visible
       visibleTeams = new Set(members.map(([name]) => name));
 
-      // Stats (pass liveGamedays count for display)
-      renderStats(gamedays, members, liveGamedays.length);
+      // Stats — use standings (includes live), pass completed count separately
+      renderStats(standingsGamedays, standingsMembers, liveGamedays.length, completedGamedays.length);
 
       // Controls (team toggles)
       renderControls(members, 'rankControls');
@@ -741,12 +757,12 @@
       // Charts — all use completed gamedays only
       renderRankChart(labels, members, matchDetails);
 
-      // Tables
-      renderTable(gamedays, members);
-      renderPrizes(gamedays, members, data, completedGdIds);
+      // Tables — standings & prizes include live matches
+      renderTable(standingsGamedays, standingsMembers);
+      renderPrizes(standingsGamedays, standingsMembers, data, allGdIds);
 
       // Per-match leaderboard gets ALL gamedays (including live)
-      renderMatchLeaderboard(allGamedays, members);
+      renderMatchLeaderboard(allGamedays, standingsMembers);
 
       // New visualizations — completed only
       renderHeatmap(labels, gamedays, members, matchDetails);
@@ -757,7 +773,7 @@
       if (currentFileName.includes('JSONBin')) startAutoRefresh();
     }
 
-    function renderStats(gamedays, members, liveCount) {
+    function renderStats(gamedays, members, liveCount, completedCount) {
       const lastGd = gamedays[gamedays.length - 1];
       const leaderName = members[0]?.[0] || '—';
       const leaderPts = members[0]?.[1].points.filter(p=>p!=null).pop() || '—';
@@ -775,7 +791,7 @@
       const bestMatchLabel = bestGd ? `${bestGd.matchName} (M${bestGd.gamedayId})` : '';
 
       const matchesLabel = liveCount > 0
-        ? `${gamedays.length}<span style="font-size:12px;color:var(--text-dim);display:block;">${gamedays.length} completed + ${liveCount} live</span>`
+        ? `${gamedays.length}<span style="font-size:12px;color:var(--text-dim);display:block;">${completedCount} completed + ${liveCount} live</span>`
         : `${gamedays.length}`;
 
       const html = `
@@ -795,7 +811,7 @@
           noteEl.style.cssText = 'text-align:center;padding:10px 20px;margin:4px auto 16px;font-size:14px;color:#fdcb6e;background:rgba(253,203,110,0.1);border:1px solid rgba(253,203,110,0.3);border-radius:8px;white-space:nowrap;';
           document.getElementById('statsRow').after(noteEl);
         }
-        noteEl.innerHTML = '⚡ Live match scores are estimated and shown only in <b>Per-Match Leaderboard</b>. All other tabs use completed matches only.';
+        noteEl.innerHTML = '⚡ Live match scores are estimated. <b>Standings</b>, <b>Per-Match Leaderboard</b> & <b>Prizes</b> include live data. Charts and Heatmap update after match completion.';
         noteEl.style.animation = 'liveNotePulse 0.8s ease-in-out 6';
         setTimeout(() => { noteEl.style.animation = ''; }, 5000);
       } else if (noteEl) {
@@ -1183,7 +1199,7 @@
         html += `<p style="margin-bottom:8px;"><span style="background:#fdcb6e;color:#000;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">⚡ LIVE</span></p>`;
       }
 
-      html += `<p class="subtitle" style="margin-bottom:6px;">🏆 Best: <strong style="color:${colorMap[best.name] || '#fff'}">${best.name}</strong> (${best.gdPts} pts) &nbsp;|&nbsp; Lowest: <strong style="color:${colorMap[worst.name] || '#fff'}">${worst.name}</strong> (${worst.gdPts} pts)</p>`;
+      html += `<p class="subtitle" style="margin-bottom:6px;">🏆 Best:<strong style="color:${colorMap[best.name] || '#fff'}">${best.name}</strong> (${best.gdPts} pts) &nbsp;|&nbsp; Lowest: <strong style="color:${colorMap[worst.name] || '#fff'}">${worst.name}</strong> (${worst.gdPts} pts)</p>`;
       if (boosterUsers.length > 0) {
         const boosterSummary = boosterUsers.map(e => `<strong style="color:${colorMap[e.name] || '#fff'}">${e.name}</strong> used ${boosterLabel(e.boosterId)}`).join(' &nbsp;|&nbsp; ');
         html += `<p class="subtitle" style="margin-bottom:6px;">🔥 Boosters: ${boosterSummary}</p>`;
@@ -1237,9 +1253,11 @@
 
     // ---- Standings Table ----
     function renderTable(gamedays, members) {
-      let html = '<p class="subtitle" style="margin-bottom:16px;">Rank change is compared to Match 1 standings (baseline)</p>';
+      const hasLive = gamedays.some(gd => gd.isEstimated || gd.isLive);
+      const star = hasLive ? '<span style="color:#fdcb6e;" title="Includes live match — not final">*</span>' : '';
+      let html = '<p class="subtitle" style="margin-bottom:16px;">Rank change is compared to Match 1 standings (baseline)' + (hasLive ? ' &nbsp;<span style="color:#fdcb6e;font-size:12px;">* includes live match estimates</span>' : '') + '</p>';
       html += '<table><thead><tr>';
-      html += '<th>#</th><th>Team</th><th>Points</th><th>Last Match Pts</th><th>Rank (M1→Now)</th>';
+      html += '<th>#</th><th>Team</th><th>Points</th><th>Rank (M1→Now)</th>';
       html += '<th>Transfers Left</th><th>Boosters Used</th><th>Best Rank</th><th>Worst Rank</th>';
       html += '</tr></thead><tbody>';
 
@@ -1272,8 +1290,7 @@
         html += `<tr>
           <td><span style="color:${color};font-weight:700;">${currentRank}</span></td>
           <td><span class="dot" style="background:${color};margin-right:8px;"></span>${name}</td>
-          <td>${currentPts}</td>
-          <td>${lastGdPts}</td>
+          <td>${currentPts}${star}</td>
           <td>${changeHtml}</td>
           <td style="text-align:center;">${subsHtml}</td>
           <td style="text-align:center;">${boosterHtml}</td>
@@ -1284,7 +1301,12 @@
 
       html += '</tbody></table>';
       document.getElementById('standingsTable').innerHTML = html;
-      document.getElementById('standingsHeading').textContent = `Current Standings (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})`;
+      const completedInStandings = gamedays.filter(gd => !gd.isEstimated && !gd.isLive).length;
+      const liveInStandings = gamedays.length - completedInStandings;
+      const headingText = liveInStandings > 0
+        ? `Current Standings (${completedInStandings} Completed + ${liveInStandings} Live)`
+        : `Current Standings (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})`;
+      document.getElementById('standingsHeading').textContent = headingText;
     }
 
     // ---- Prizes ----
@@ -1297,15 +1319,23 @@
       const allMembers = members;
       const leaderPts = allMembers[0]?.[1].points.filter(p => p != null).pop() || 0;
 
-      // Booster ranking — only count completed matches
+      const liveGdIds = new Set(gamedays.filter(gd => gd.isEstimated || gd.isLive).map(gd => gd.gamedayId));
+      const liveGdMatchNames = {};
+      gamedays.filter(gd => gd.isEstimated || gd.isLive).forEach(gd => { liveGdMatchNames[gd.gamedayId] = gd.matchName || `M${gd.gamedayId}`; });
+
+      // Booster ranking
       const boosterRanking = (data.members || [])
         .map(m => {
-          const completedDetails = (m.boosterDetails || []).filter(b => completedGdIds.has(b.gd));
+          const includedDetails = (m.boosterDetails || []).filter(b => completedGdIds.has(b.gd));
+          const liveBooster = (m.boosterDetails || []).find(b => liveGdIds.has(b.gd));
           return {
             name: m.teamName,
-            totalBoosterPts: completedDetails.reduce((s, b) => s + (b.boosterPoints || 0), 0),
-            boosterCount: completedDetails.length,
-            details: completedDetails,
+            totalBoosterPts: includedDetails.reduce((s, b) => s + (b.boosterPoints || 0), 0),
+            boosterCount: includedDetails.length,
+            details: includedDetails,
+            hasLiveBooster: !!liveBooster,
+            liveBoosterId: liveBooster ? liveBooster.boosterId : null,
+            liveMatchName: liveBooster ? (liveGdMatchNames[liveBooster.gd] || '') : '',
           };
         })
         .sort((a, b) => b.totalBoosterPts - a.totalBoosterPts);
@@ -1327,7 +1357,14 @@
           .sort((a, b) => b.pts - a.pts);
       }
 
-      let html = `<p class="subtitle" style="margin-bottom:16px;">Prize pool: $900 (12 × $75). After ${gamedays.length} match${gamedays.length !== 1 ? 'es' : ''}.</p>`;
+      const hasLive = gamedays.some(gd => gd.isEstimated || gd.isLive);
+      const completedCount = gamedays.filter(gd => !gd.isEstimated && !gd.isLive).length;
+      const liveCount = gamedays.length - completedCount;
+      const star = hasLive ? '<span style="color:#fdcb6e;" title="Includes live match — not final">*</span>' : '';
+      const matchSuffix = hasLive
+        ? `${completedCount} completed + ${liveCount} live`
+        : `${gamedays.length} match${gamedays.length !== 1 ? 'es' : ''}`;
+      let html = `<p class="subtitle" style="margin-bottom:16px;">Prize pool: $900 (12 × $75). After ${matchSuffix}.${hasLive ? ' <span style="color:#fdcb6e;font-size:12px;">* includes live match estimates</span>' : ''}</p>`;
 
       // Use a 2-column grid for the prize cards
       html += `<div class="prize-grid-responsive" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
@@ -1343,7 +1380,7 @@
         const prize = i === 0 ? '$375' : i === 1 ? '$200' : i === 2 ? '$150' : '';
         const prizeHtml = prize ? `<span style="color:#fdcb6e;font-size:11px;"> ${prize}</span>` : '';
         const rank = i < MEDAL.length ? MEDAL[i] : `${i + 1}`;
-        html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${name}${prizeHtml}</td><td style="font-weight:700;">${pts}</td><td>${gap}</td></tr>`;
+        html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${name}${prizeHtml}</td><td style="font-weight:700;">${pts}${star}</td><td>${gap}</td></tr>`;
       });
       html += `</tbody></table></div>`;
 
@@ -1352,16 +1389,23 @@
       html += `<h4 style="margin:0 0 8px 0;">🔥 Master of Boosters — <span style="color:#fdcb6e;">$100</span></h4>`;
       const anyBoosters = boosterRanking.some(b => b.totalBoosterPts > 0);
       if (anyBoosters) {
-        html += `<table style="font-size:13px;"><thead><tr><th>#</th><th>Team</th><th>Booster Pts</th><th>Used</th><th>Details</th></tr></thead><tbody>`;
+        html += `<table style="font-size:13px;"><thead><tr><th>#</th><th>Team</th><th>Booster Pts</th><th>Used</th><th>Live Booster</th></tr></thead><tbody>`;
         boosterRanking.forEach((b, i) => {
           const color = memberColorMap[b.name] || '#8b8fa3';
-          const detailStr = b.details.map(d => `M${d.gd}: ${boosterLabel(d.boosterId)} (${d.boosterPoints})`).join(', ') || '—';
+          const tooltipStr = b.details.map(d => `M${d.gd}: ${boosterLabel(d.boosterId)} (${d.boosterPoints})`).join('\n') || 'No boosters used';
           const rank = i < MEDAL.length ? MEDAL[i] : `${i + 1}`;
-          html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${b.name}</td>`;
-          html += `<td style="font-weight:700;">${b.totalBoosterPts}</td><td style="text-align:center;">${b.boosterCount}/10</td>`;
-          html += `<td style="font-size:11px;">${detailStr}</td></tr>`;
+          const bStar = b.hasLiveBooster ? star : '';
+          const liveCol = b.liveBoosterId
+            ? `<span style="background:#fdcb6e;color:#000;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;">🔥 ${boosterLabel(b.liveBoosterId)} (${b.liveMatchName})</span>`
+            : '<span style="opacity:0.3;">—</span>';
+          html += `<tr title="${tooltipStr.replace(/"/g, '&quot;')}" style="cursor:default;">`;
+          html += `<td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${b.name}</td>`;
+          html += `<td style="font-weight:700;">${b.totalBoosterPts}${bStar}</td><td style="text-align:center;">${b.boosterCount}/10</td>`;
+          html += `<td style="text-align:center;">${liveCol}</td>`;
+          html += `</tr>`;
         });
         html += `</tbody></table>`;
+        html += `<p style="opacity:0.5;font-size:11px;margin-top:6px;">Hover over a row to see booster details</p>`;
       } else {
         html += `<p style="opacity:0.5;font-size:13px;">No boosters used yet. Race heats up as teams deploy their 10 boosters!</p>`;
       }
@@ -1375,7 +1419,7 @@
         playoffRanking.forEach((r, i) => {
           const color = memberColorMap[r.name] || '#8b8fa3';
           const rank = i < MEDAL.length ? MEDAL[i] : `${i + 1}`;
-          html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${r.name}</td><td style="font-weight:700;">${r.pts}</td></tr>`;
+          html += `<tr><td>${rank}</td><td><span class="dot" style="background:${color};margin-right:6px;"></span>${r.name}</td><td style="font-weight:700;">${r.pts}${star}</td></tr>`;
         });
         html += `</tbody></table>`;
       } else {
