@@ -401,6 +401,7 @@
         <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
         <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
         <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
+        <button class="view-tab" data-view="transferHeatmap" onclick="switchView('transferHeatmap')">Transfer Efficiency</button>
       </div>
 
       <!-- Rank Chart -->
@@ -443,6 +444,25 @@
         <h3>Rank Heatmap</h3>
         <p class="subtitle">Green = top rank, Red = bottom rank. Each cell shows the league rank after that match.</p>
         <div class="heatmap-scroll" id="heatmapContainer"></div>
+      </div>
+
+      <!-- Transfer Efficiency Heatmap -->
+      <div class="chart-section" id="transferHeatmapView" style="display:none;">
+        <h3>Transfer Efficiency</h3>
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:13px;line-height:1.6;color:var(--text-dim);">
+          <strong style="color:var(--text-main);font-size:14px;">How it works</strong><br>
+          Before each match, you can transfer players in/out. We track how those transfers performed:<br><br>
+          <strong style="color:var(--text-main);">Avg Pts per Transfer</strong> = Points scored by transferred-in players ÷ Number of transfers<br>
+          <em>Example: You swap in 3 players who score 120 pts total → Avg = 120 ÷ 3 = 40 pts/transfer</em><br><br>
+          <strong style="color:var(--text-main);">Transfer Efficiency %</strong> = Points from transferred-in players ÷ Total match points × 100<br>
+          <em>Example: Transfers scored 120 pts, your total match score is 300 → Efficiency = 120 ÷ 300 = 40%</em><br><br>
+          <strong style="color:var(--text-main);">🎯 Free Hit / Wild Card:</strong> These boosters change the entire squad temporarily, so they are <strong>skipped</strong> (shown as "FH"). The next match compares against the squad from <em>before</em> the booster was used.<br>
+          <strong style="color:var(--text-main);">➖ Dash (—):</strong> No transfers were made for that match.<br>
+          <strong style="color:var(--text-main);">📊 Overall:</strong> Sum of all transfer-in pts across the season ÷ Total season points.
+        </div>
+        <div class="heatmap-scroll" id="transferAvgContainer"></div>
+        <div style="height:24px;"></div>
+        <div class="heatmap-scroll" id="transferEffContainer"></div>
       </div>
 
       <!-- Points Race: side-by-side bar race + line progression -->
@@ -768,6 +788,9 @@
       renderHeatmap(labels, gamedays, members, matchDetails);
       initRace(gamedays, members, matchDetails);
       renderPtsAnimChart(labels, members, matchDetails);
+
+      // Transfer efficiency heatmap — includes live data
+      renderTransferHeatmap(standingsGamedays, standingsMembers);
 
       // Update tab labels with * when live data present
       const liveStar = liveGamedays.length > 0 ? '*' : '';
@@ -1252,6 +1275,7 @@
       document.getElementById('prizesView').style.display = view === 'prizes' ? '' : 'none';
       document.getElementById('matchLbView').style.display = view === 'matchLb' ? '' : 'none';
       document.getElementById('heatmapView').style.display = view === 'heatmap' ? '' : 'none';
+      document.getElementById('transferHeatmapView').style.display = view === 'transferHeatmap' ? '' : 'none';
       document.getElementById('raceView').style.display = view === 'race' ? '' : 'none';
       if (view === 'race') { stopRace(); ptsAnimDraw(ptsAnim.progress); }
       if (view !== 'race') stopRace();
@@ -1486,6 +1510,133 @@
 
       html += '</tbody></table>';
       document.getElementById('heatmapContainer').innerHTML = html;
+    }
+
+    // ---- Transfer Efficiency Heatmap ----
+    function renderTransferHeatmap(gamedays, members) {
+      // Build per-team per-gameday transfer data from leaderboard entries
+      const teamData = {}; // name -> [ { gd, avg, eff, count, free, isLive } ]
+      const memberColors = {};
+      members.forEach(([name], i) => { memberColors[name] = COLORS[i % COLORS.length]; });
+
+      gamedays.forEach((gd) => {
+        gd.leaderboard.forEach(e => {
+          const name = e.teamName || e.temname;
+          if (!teamData[name]) teamData[name] = [];
+          teamData[name].push({
+            gd: gd.gamedayId,
+            avg: e.transferAvg || 0,
+            eff: e.transferEfficiency || 0,
+            count: e.transferCount || 0,
+            pts: e.transferInPts || 0,
+            free: e.isFreeSquadChange || false,
+            freeLabel: e.isFreeSquadChange ? (e.boosterId === 11 ? 'FH' : 'WC') : '',
+            isLive: gd.isLive || gd.isEstimated,
+          });
+        });
+      });
+
+      // Color scale: white (0) → green (high)
+      function avgColor(val, max) {
+        if (val === 0) return 'transparent';
+        const t = Math.min(val / Math.max(max, 1), 1);
+        const r = Math.round(255 - t * 255);
+        const g = Math.round(255 - t * 71);
+        const b = Math.round(255 - t * 207);
+        return `rgb(${r},${g},${b})`;
+      }
+      function effColor(val) {
+        if (val === 0) return 'transparent';
+        const t = Math.min(val / 100, 1);
+        const r = Math.round(255 - t * 255);
+        const g = Math.round(255 - t * 71);
+        const b = Math.round(255 - t * 207);
+        return `rgb(${r},${g},${b})`;
+      }
+
+      // Find max avg for scaling
+      let maxAvg = 0;
+      Object.values(teamData).forEach(matches => {
+        matches.forEach(m => { if (!m.free && m.avg > maxAvg) maxAvg = m.avg; });
+      });
+
+      // Sort members by current standings order
+      const sortedNames = members.map(([name]) => name);
+
+      // Build Avg Pts per Transfer table
+      let html1 = '<h4 style="margin:0 0 4px 0;">Avg Pts per Transfer</h4>';
+      html1 += '<p style="margin:0 0 8px 0;font-size:12px;color:var(--text-dim);">= Points scored by transferred-in players ÷ Number of transfers</p>';
+      html1 += '<table class="heatmap-table"><thead><tr><th>Team</th>';
+      gamedays.forEach(gd => {
+        html1 += `<th title="${gd.matchName} (${gd.matchDate})">M${gd.gamedayId}</th>`;
+      });
+      html1 += '<th>Overall</th></tr></thead><tbody>';
+
+      sortedNames.forEach(name => {
+        const matches = teamData[name] || [];
+        const color = memberColors[name] || '#8b8fa3';
+        html1 += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name}</td>`;
+        let totalPts = 0, totalCount = 0;
+        matches.forEach(m => {
+          const star = m.isLive ? '*' : '';
+          if (m.free) {
+            html1 += `<td class="hm-cell" style="background:rgba(231,76,60,0.15);color:#e74c3c;font-size:11px;font-weight:600;" title="Free Hit / Wild Card — skipped">${m.freeLabel}</td>`;
+          } else if (m.count === 0) {
+            html1 += '<td class="hm-cell" style="background:rgba(255,255,255,0.05);color:#888;">—</td>';
+          } else {
+            const bg = avgColor(m.avg, maxAvg);
+            html1 += `<td class="hm-cell" style="background:${bg};color:#000;" title="${m.count} transfers, ${m.pts} pts">${m.avg} <span style="font-size:10px;opacity:0.6;">(${m.count})</span>${star}</td>`;
+            totalPts += m.pts;
+            totalCount += m.count;
+          }
+        });
+        const overallAvg = totalCount > 0 ? Math.round(totalPts / totalCount * 10) / 10 : 0;
+        const oBg = avgColor(overallAvg, maxAvg);
+        html1 += `<td class="hm-cell" style="background:${oBg};color:#000;font-weight:700;" title="${totalCount} total transfers">${overallAvg} <span style="font-size:10px;opacity:0.6;">(${totalCount})</span></td>`;
+        html1 += '</tr>';
+      });
+      html1 += '</tbody></table>';
+      document.getElementById('transferAvgContainer').innerHTML = html1;
+
+      // Build Efficiency % table
+      let html2 = '<h4 style="margin:0 0 4px 0;">Transfer Efficiency %</h4>';
+      html2 += '<p style="margin:0 0 8px 0;font-size:12px;color:var(--text-dim);">= Points from transferred-in players ÷ Total match points × 100</p>';
+      html2 += '<table class="heatmap-table"><thead><tr><th>Team</th>';
+      gamedays.forEach(gd => {
+        html2 += `<th title="${gd.matchName} (${gd.matchDate})">M${gd.gamedayId}</th>`;
+      });
+      html2 += '<th>Overall</th></tr></thead><tbody>';
+
+      sortedNames.forEach(name => {
+        const matches = teamData[name] || [];
+        const color = memberColors[name] || '#8b8fa3';
+        html2 += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name}</td>`;
+        let totalPts = 0, totalGdPts = 0, totalCount = 0;
+        matches.forEach(m => {
+          const star = m.isLive ? '*' : '';
+          if (m.free) {
+            html2 += `<td class="hm-cell" style="background:rgba(231,76,60,0.15);color:#e74c3c;font-size:11px;font-weight:600;" title="Free Hit / Wild Card — skipped">${m.freeLabel}</td>`;
+          } else if (m.count === 0) {
+            html2 += '<td class="hm-cell" style="background:rgba(255,255,255,0.05);color:#888;">—</td>';
+          } else {
+            const bg = effColor(m.eff);
+            html2 += `<td class="hm-cell" style="background:${bg};color:#000;" title="${m.count} transfers, ${m.pts}/${m.pts + (m.pts * (100 - m.eff) / m.eff || 0)} pts">${m.eff} <span style="font-size:10px;opacity:0.6;">(${m.count})</span>${star}</td>`;
+            totalCount += m.count;
+          }
+          if (!m.free && m.count > 0) totalPts += m.pts;
+        });
+        const memberEntry = members.find(([n]) => n === name);
+        if (memberEntry) {
+          const gdPtsArr = memberEntry[1].gdPoints || [];
+          totalGdPts = gdPtsArr.reduce((s, p) => s + (p || 0), 0);
+        }
+        const overallEff = totalGdPts > 0 ? Math.round(totalPts / totalGdPts * 1000) / 10 : 0;
+        const eBg = effColor(overallEff);
+        html2 += `<td class="hm-cell" style="background:${eBg};color:#000;font-weight:700;">${overallEff} <span style="font-size:10px;opacity:0.6;">(${totalCount})</span></td>`;
+        html2 += '</tr>';
+      });
+      html2 += '</tbody></table>';
+      document.getElementById('transferEffContainer').innerHTML = html2;
     }
 
     // ---- Bar Chart Race ----

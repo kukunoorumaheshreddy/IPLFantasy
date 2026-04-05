@@ -46,15 +46,6 @@
     return r.json();
   }
 
-  function downloadJSON(data, filename) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 
   async function uploadToJsonBin(data) {
     const resp = await fetch(JSONBIN_API, {
@@ -109,6 +100,22 @@
 
   // ── Main extraction function (called each poll cycle) ──
   async function runExtraction() {
+
+  // ── 0. Load existing data from JSONBin (for cached player data) ──
+  let cachedPlayerData = {}; // gd -> { playerId -> { name, gdPoints, isOverseas, teamId } }
+  try {
+    log("Loading existing data from JSONBin for player cache...");
+    const existing = await fetch(`${JSONBIN_API}/latest`).then(r => r.json());
+    const prev = existing.record || existing;
+    if (prev && prev.playerDataCache) {
+      cachedPlayerData = prev.playerDataCache;
+      log(`  Loaded cached player data for ${Object.keys(cachedPlayerData).length} gamedays`);
+    } else {
+      log("  No cached player data found, will fetch all.");
+    }
+  } catch (e) {
+    log("  Could not load existing data, will fetch all: " + e.message);
+  }
 
   // ── 1. Get fixtures ──
   log("Fetching fixtures...");
@@ -210,6 +217,7 @@
 
   // ── 3b. Fallback: calculate live match scores using v1 approach ──
   // Find gamedays that are live/recent but have no points from overall-get
+  const playerDataByGd = {}; // gd -> { playerId -> { name, gdPoints, isOverseas, teamId } }
   const liveGds = gamedayIds.filter(gd => matchInfo[gd]?.isLive);
   const missingPtsGds = gamedayIds.filter(gd => {
     // Check if ANY member is missing points for this gameday
@@ -254,9 +262,12 @@
         playerMap[p.Id] = {
           name: p.Name,
           gdPoints: playsInThisMatch ? (p.GamedayPoints || 0) : 0,
+          isOverseas: p.IS_FP === 1 || p.IS_FP === '1' || p.Is_FP === 1 || p.is_fp === 1,
           teamId: p.TeamId,
         };
       });
+      // Save for transfer efficiency (step 5b will skip this GD since it's already populated)
+      playerDataByGd[gd] = playerMap;
       log(`  ${allPlayers.length} players loaded for GD${gd} (${mi?.matchName}), filtered to teams: ${[...matchTeamIds].join(', ')}`);
 
       for (const m of members) {
@@ -309,8 +320,7 @@
     log("  No boosters used yet.");
   }
 
-  // Fetch player data ONLY for gamedays where boosters were used
-  const playerDataByGd = {}; // gd -> { playerId -> { name, gdPoints, isOverseas } }
+  // Fetch player data ONLY for gamedays where boosters were used (that we don't already have)
   const needsPlayerData = [...boosterGds].filter(gd => {
     // Only need player-level data for boosters that aren't whole-team types
     return boosterMatches.some(bm =>
@@ -318,8 +328,12 @@
     );
   });
 
-  // Always fetch for booster GDs anyway so we can log player details
+  // Fetch for booster GDs that we don't already have player data for
   for (const gd of boosterGds) {
+    if (playerDataByGd[gd]) {
+      log(`  GD${gd}: reusing player data from step 3b`);
+      continue;
+    }
     log(`Fetching player data for booster GD${gd}...`);
     const playersResp = await apiFetch(
       `feed/live/gamedayplayers?lang=en&tourgamedayId=${gd}&teamgamedayId=${gd}&liveVersion=999`
@@ -342,6 +356,7 @@
         isOverseas: p.IS_FP === 1 || p.IS_FP === '1' || p.Is_FP === 1 || p.is_fp === 1,
         countryCode: p.CountryCode || p.Nationality || null,
         skillId: p.SkillId || p.Skill || null,
+        teamId: p.TeamId,
       };
     });
     playerDataByGd[gd] = pmap;
@@ -491,10 +506,74 @@
     }
   }
 
+  // ── 5b. Fetch player data for transfer efficiency ──
+  // Merge step 3b's live player data and step 4's booster player data into playerDataByGd
+  // Then fetch remaining gamedays from cache or API
+  log("\n── Fetching player data for transfer efficiency ──");
+
+  // Step 3b saves to local playerMap — we need to also save those
+  // (Already in playerDataByGd from step 4 for booster GDs)
+
+  // Identify which GDs still need player data
+  const gdsNeedingPlayerData = gamedayIds.filter(gd => !playerDataByGd[gd]);
+  const gdsFromCache = [];
+  const gdsToFetch = [];
+
+  for (const gd of gdsNeedingPlayerData) {
+    if (cachedPlayerData[gd] && !matchInfo[gd]?.isLive) {
+      // Use cached data for completed, non-live gamedays
+      playerDataByGd[gd] = cachedPlayerData[gd];
+      gdsFromCache.push(gd);
+    } else {
+      gdsToFetch.push(gd);
+    }
+  }
+
+  if (gdsFromCache.length > 0) log(`  Using cached player data for GDs: ${gdsFromCache.join(', ')}`);
+  if (gdsToFetch.length > 0) log(`  Fetching player data for GDs: ${gdsToFetch.join(', ')}`);
+
+  for (const gd of gdsToFetch) {
+    const playersResp = await apiFetch(
+      `feed/live/gamedayplayers?lang=en&tourgamedayId=${gd}&teamgamedayId=${gd}&liveVersion=999`
+    );
+    const allPlayers = playersResp?.Data?.Value?.Players || [];
+    if (allPlayers.length === 0) {
+      log(`  GD${gd}: no player data, skipping.`);
+      continue;
+    }
+
+    const mi = matchInfo[gd];
+    const matchTeamIds = new Set();
+    if (mi?.homeTeamId) matchTeamIds.add(mi.homeTeamId);
+    if (mi?.awayTeamId) matchTeamIds.add(mi.awayTeamId);
+    const isLiveGd = fallbackGds.includes(gd);
+
+    const pmap = {};
+    allPlayers.forEach(p => {
+      const playsInThisMatch = !isLiveGd || matchTeamIds.size === 0 || matchTeamIds.has(p.TeamId);
+      pmap[p.Id] = {
+        name: p.Name,
+        gdPoints: playsInThisMatch ? (p.GamedayPoints || 0) : 0,
+        isOverseas: p.IS_FP === 1 || p.IS_FP === '1' || p.Is_FP === 1 || p.is_fp === 1,
+        teamId: p.TeamId,
+      };
+    });
+    playerDataByGd[gd] = pmap;
+    log(`  GD${gd} (${mi?.matchName}): ${allPlayers.length} players loaded`);
+    await sleep(DELAY_MS);
+  }
+
+  log(`  Player data available for ${Object.keys(playerDataByGd).length}/${gamedayIds.length} gamedays`);
+
   // ── 6. Build cumulative rankings per gameday ──
   log("\n── Building cumulative rankings ──");
   const cumulative = {};
   members.forEach(m => { cumulative[m.teamName] = 0; });
+
+  // Track "last real squad" per team for transfer efficiency
+  // FREE_HIT / WILD_CARD squads are temporary — skip them when tracking
+  const lastRealSquad = {}; // teamName -> Set of player IDs
+  members.forEach(m => { lastRealSquad[m.teamName] = null; });
 
   const output = {
     leagueId: LEAGUE_ID,
@@ -511,6 +590,13 @@
       totalBoosterPoints: (boosterPointsMap[m.teamName] || []).reduce((s, b) => s + b.boosterPoints, 0),
     })),
     gamedays: [],
+    // Cache player data for completed gamedays (avoid re-fetching)
+    playerDataCache: Object.fromEntries(
+      Object.entries(playerDataByGd).filter(([gd]) => {
+        const gdNum = parseInt(gd);
+        return !matchInfo[gdNum]?.isLive && !fallbackGds.includes(gdNum);
+      })
+    ),
   };
 
   for (const gd of gamedayIds) {
@@ -525,6 +611,51 @@
         const td = teamData[m.teamName]?.perMatch?.[gd] || {};
         const gdPts = teamData[m.teamName]?.gdPtsMap?.[gd] || 0;
         const bm = (boosterPointsMap[m.teamName] || []).find(b => b.gd === gd);
+
+        // Transfer efficiency: compare current squad to last real squad
+        const currentSquad = new Set(td.squad || []);
+        const prevSquad = lastRealSquad[m.teamName];
+        const boosterType = td.boosterId ? (BOOSTER_TYPE[td.boosterId] || null) : null;
+        const isFreeSquadChange = boosterType === 'FREE_HIT' || boosterType === 'WILD_CARD';
+
+        let transfersIn = [];
+        let transfersOut = [];
+        let transferInPts = 0;
+
+        if (prevSquad && currentSquad.size > 0 && !isFreeSquadChange) {
+          currentSquad.forEach(pid => { if (!prevSquad.has(pid)) transfersIn.push(pid); });
+          prevSquad.forEach(pid => { if (!currentSquad.has(pid)) transfersOut.push(pid); });
+
+          // Calculate boosted points for transferred-in players
+          const playerData = playerDataByGd[gd] || {};
+          const pmi = matchInfo[gd] || {};
+          const mTeamIds = new Set();
+          if (pmi.homeTeamId) mTeamIds.add(pmi.homeTeamId);
+          if (pmi.awayTeamId) mTeamIds.add(pmi.awayTeamId);
+
+          transfersIn.forEach(pid => {
+            const p = playerData[pid];
+            const inMatch = p ? mTeamIds.has(p.teamId) : false;
+            const pts = inMatch ? (p ? p.gdPoints : 0) : 0;
+            const mult = pid === td.captainId ? 2 : pid === td.viceCaptainId ? 1.5 : 1;
+            let boosterMult = 1;
+            if (boosterType === 'DOUBLE_POWER') boosterMult = 2;
+            else if (boosterType === 'INDIAN_WARRIORS' && p && !p.isOverseas) boosterMult = 2;
+            else if (boosterType === 'FOREIGN_STARS' && p && p.isOverseas) boosterMult = 2;
+            else if (boosterType === 'TRIPLE_CAPTAIN' && pid === td.captainId) boosterMult = 1.5;
+            transferInPts += pts * mult * boosterMult;
+          });
+        }
+
+        const transferCount = transfersIn.length;
+        const transferEfficiency = gdPts > 0 ? Math.round(transferInPts / gdPts * 1000) / 10 : 0;
+        const transferAvg = transferCount > 0 ? Math.round(transferInPts / transferCount * 10) / 10 : 0;
+
+        // Update last real squad (skip FREE_HIT/WILD_CARD — squad reverts after)
+        if (!isFreeSquadChange && currentSquad.size > 0) {
+          lastRealSquad[m.teamName] = currentSquad;
+        }
+
         return {
           teamName: m.teamName,
           teamId: m.teamId,
@@ -539,6 +670,11 @@
           subsLeft: td.subsLeft ?? null,
           subsThisMatch: td.subsThisMatch ?? null,
           subsTotal: teamData[m.teamName]?.subsTotal ?? null,
+          transferCount,
+          transferInPts: Math.round(transferInPts * 100) / 100,
+          transferEfficiency,
+          transferAvg,
+          isFreeSquadChange,
         };
       })
       .sort((a, b) => b.totalPoints - a.totalPoints);
@@ -594,12 +730,12 @@
 
   try {
     log("Uploading to JSONBin...");
-    await uploadToJsonBin(output);
+    // Strip playerDataCache from upload (dashboard doesn't need it, saves ~360KB)
+    const { playerDataCache, ...uploadPayload } = output;
+    await uploadToJsonBin(uploadPayload);
     ok(`✅ Uploaded to JSONBin successfully!`);
   } catch (e) {
-    warn(`JSONBin upload failed: ${e.message}`);
-    warn("Falling back to file download...");
-    downloadJSON(output, `ipl-fantasy-v2-master-gd${latestGdId}.json`);
+    warn(`Upload failed: ${e.message}`);
   }
 
   ok(`\n✅ Done! ${gamedayIds.length} matches, ${members.length} members, ${boosterMatches.length} booster usages`);
