@@ -24,7 +24,7 @@
   const HEADERS = { "entity": "d3tR0!t5m@sh" };
   const DELAY_MS = 300;
   const PHASE_ID = 1;
-  const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  const POLL_INTERVAL_MS = 7 * 60 * 1000; // 7 minutes
 
   // ── JSONBin config ──
   const JSONBIN_BIN_ID = "69d137a6aaba882197c4a0cb";
@@ -325,18 +325,27 @@
       `feed/live/gamedayplayers?lang=en&tourgamedayId=${gd}&teamgamedayId=${gd}&liveVersion=999`
     );
     const allPlayers = playersResp?.Data?.Value?.Players || [];
+
+    // For live matches, filter player points by match teams (same fix as step 3b)
+    const mi = matchInfo[gd];
+    const matchTeamIds = new Set();
+    if (mi?.homeTeamId) matchTeamIds.add(mi.homeTeamId);
+    if (mi?.awayTeamId) matchTeamIds.add(mi.awayTeamId);
+    const isLiveGd = fallbackGds.includes(gd);
+
     const pmap = {};
     allPlayers.forEach(p => {
+      const playsInThisMatch = !isLiveGd || matchTeamIds.size === 0 || matchTeamIds.has(p.TeamId);
       pmap[p.Id] = {
         name: p.Name,
-        gdPoints: p.GamedayPoints || 0,
+        gdPoints: playsInThisMatch ? (p.GamedayPoints || 0) : 0,
         isOverseas: p.IS_FP === 1 || p.IS_FP === '1' || p.Is_FP === 1 || p.is_fp === 1,
         countryCode: p.CountryCode || p.Nationality || null,
         skillId: p.SkillId || p.Skill || null,
       };
     });
     playerDataByGd[gd] = pmap;
-    log(`  ${allPlayers.length} players loaded for GD${gd}`);
+    log(`  ${allPlayers.length} players loaded for GD${gd}${isLiveGd ? ` (filtered to ${mi?.matchName})` : ''}`);
 
     // Log sample player to show available fields (first time only)
     if ([...boosterGds][0] === gd && allPlayers.length > 0) {
@@ -434,6 +443,52 @@
     });
 
     log(`  ${bm.teamName} GD${bm.gd} (${bm.boosterType}): ${boosterPoints} booster pts (match total: ${gdPts})`);
+
+    // For live/estimated matches, the fallback only calculated base score.
+    // The API's gdpts for completed matches already includes booster effects,
+    // so we need to apply boosters to live match scores too.
+    if (fallbackGds.includes(bm.gd)) {
+      const td = teamData[bm.teamName];
+      const basePts = td.gdPtsMap[bm.gd] || 0;
+      let boostedTotal = basePts;
+
+      if (bm.boosterType === 'DOUBLE_POWER') {
+        boostedTotal = basePts * 2;
+      } else if (bm.boosterType === 'TRIPLE_CAPTAIN') {
+        // Captain already counted as x2 in base; add extra x1 for triple
+        const captainPlayer = players[pm.captainId];
+        if (captainPlayer) boostedTotal = basePts + captainPlayer.gdPoints;
+      } else if (bm.boosterType === 'FOREIGN_STARS') {
+        // Add extra copy of foreign players' effective pts
+        let foreignExtra = 0;
+        pm.squad.forEach(pid => {
+          const p = players[pid];
+          if (p && p.isOverseas) {
+            let baseMult = pid === pm.captainId ? 2 : pid === pm.viceCaptainId ? 1.5 : 1;
+            foreignExtra += p.gdPoints * baseMult;
+          }
+        });
+        boostedTotal = basePts + foreignExtra;
+      } else if (bm.boosterType === 'INDIAN_WARRIORS') {
+        // Add extra copy of Indian players' effective pts
+        let indianExtra = 0;
+        pm.squad.forEach(pid => {
+          const p = players[pid];
+          if (p && !p.isOverseas) {
+            let baseMult = pid === pm.captainId ? 2 : pid === pm.viceCaptainId ? 1.5 : 1;
+            indianExtra += p.gdPoints * baseMult;
+          }
+        });
+        boostedTotal = basePts + indianExtra;
+      }
+      // FREE_HIT / WILD_CARD: no score multiplier, base stays as-is
+
+      boostedTotal = Math.round(boostedTotal * 100) / 100;
+      if (boostedTotal !== basePts) {
+        td.gdPtsMap[bm.gd] = boostedTotal;
+        log(`    ↳ Live booster applied: ${basePts} → ${boostedTotal}`);
+      }
+    }
   }
 
   // ── 6. Build cumulative rankings per gameday ──
