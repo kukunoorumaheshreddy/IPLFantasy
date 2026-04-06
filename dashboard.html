@@ -434,6 +434,7 @@
             <h3 style="margin:0;">Per-Match Leaderboard</h3>
             <select id="matchSelect" onchange="showSelectedMatch()" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;min-width:220px;">
             </select>
+            <span style="font-size:13px;font-weight:600;opacity:0.95;white-space:nowrap;margin-left:auto;margin-right:80px;">C/VC: <span style="color:#e74c3c;">⚠️ Not in match</span> &nbsp;|&nbsp; <span style="color:#f39c12;">🔄 Impact player</span></span>
           </div>
           <div id="matchLeaderboards"></div>
         </div>
@@ -1187,7 +1188,7 @@
       [...gamedays].reverse().forEach((gd) => {
         const opt = document.createElement('option');
         opt.value = gd.gamedayId;
-        opt.textContent = `Match ${gd.gamedayId}: ${gd.matchName || ''}${gd.isLive ? ' 🔴 LIVE' : ''} — ${gd.matchDate || ''}`;
+        opt.textContent = `Match ${gd.gamedayId}: ${gd.matchName || ''}${gd.isAbandoned ? ' 🚫 ABANDONED' : ''}${gd.isLive ? ' 🔴 LIVE' : ''} — ${gd.matchDate || ''}`;
         sel.appendChild(opt);
       });
 
@@ -1207,8 +1208,11 @@
           name: entry.teamName || entry.temname,
           gdPts: entry.gamedayPoints || 0,
           captain: entry.captain || '—',
+          captainStatus: entry.captainStatus || 'playing',
           viceCaptain: entry.viceCaptain || '—',
+          viceCaptainStatus: entry.viceCaptainStatus || 'playing',
           boosterId: entry.boosterId || null,
+          transfers: entry.transferCount ?? '—',
         }))
         .sort((a, b) => b.gdPts - a.gdPts);
 
@@ -1218,14 +1222,25 @@
       const boosterUsers = matchRanking.filter(e => e.boosterId);
       let html = '';
 
-      // Show "scores as of" for live/estimated matches
-      if (gd.isEstimated && gd.scoresAsOf) {
+      // Helper: format captain/VC name with status indicator
+      function formatPlayerStatus(name, status) {
+        if (status === 'not_playing') return '<span title="Not in match — team not playing" style="color:#e74c3c;">⚠️ ' + name + '</span>';
+        if (status === 'impact') return '<span title="Impact player (substitute)" style="color:#f39c12;">🔄 ' + name + '</span>';
+        return name;
+      }
+
+      // Show match status badge
+      if (gd.isAbandoned) {
+        html += `<p style="margin-bottom:8px;"><span style="background:#e74c3c;color:#fff;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">🚫 ABANDONED</span></p>`;
+      } else if (gd.isEstimated && gd.scoresAsOf) {
         const asOf = new Date(gd.scoresAsOf);
         const timeStr = asOf.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
         const dateStr = asOf.toLocaleDateString([], { month: 'short', day: 'numeric' });
         html += `<p style="margin-bottom:8px;"><span style="background:#fdcb6e;color:#000;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">⚡ LIVE — scores as of ${timeStr}, ${dateStr}</span></p>`;
       } else if (gd.isLive) {
         html += `<p style="margin-bottom:8px;"><span style="background:#fdcb6e;color:#000;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">⚡ LIVE</span></p>`;
+      } else {
+        html += `<p style="margin-bottom:8px;"><span style="background:#27ae60;color:#fff;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">✅ COMPLETED</span></p>`;
       }
 
       html += `<p class="subtitle" style="margin-bottom:6px;">🏆 Best:<strong style="color:${colorMap[best.name] || '#fff'}">${best.name}</strong> (${best.gdPts} pts) &nbsp;|&nbsp; Lowest: <strong style="color:${colorMap[worst.name] || '#fff'}">${worst.name}</strong> (${worst.gdPts} pts)</p>`;
@@ -1234,7 +1249,7 @@
         html += `<p class="subtitle" style="margin-bottom:6px;">🔥 Boosters: ${boosterSummary}</p>`;
       }
       html += `<table><thead><tr>`;
-      html += `<th>#</th><th>Team</th><th>Match Pts</th><th>Booster</th><th>Captain</th><th>Vice Captain</th>`;
+      html += `<th style="text-align:center;">#</th><th style="text-align:left;">Team</th><th style="text-align:left;width:180px;">Match Pts</th><th style="text-align:center;">Transfers</th><th style="text-align:center;">Booster</th><th style="text-align:left;">Captain</th><th style="text-align:left;">Vice Captain</th>`;
       html += `</tr></thead><tbody>`;
 
       matchRanking.forEach((entry, pos) => {
@@ -1245,6 +1260,9 @@
         const boosterBadge = entry.boosterId
           ? `<span style="background:#ff9f43;color:#000;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">${boosterLabel(entry.boosterId)}</span>`
           : '<span style="opacity:0.3;">—</span>';
+
+        const capDisplay = formatPlayerStatus(entry.captain, entry.captainStatus);
+        const vcDisplay = formatPlayerStatus(entry.viceCaptain, entry.viceCaptainStatus);
 
         html += `<tr>
           <td style="font-weight:700;text-align:center;">${medal}</td>
@@ -1257,9 +1275,10 @@
               </div>
             </div>
           </td>
+          <td style="text-align:center;">${entry.transfers}</td>
           <td style="text-align:center;">${boosterBadge}</td>
-          <td style="font-size:12px;">${entry.captain}</td>
-          <td style="font-size:12px;">${entry.viceCaptain}</td>
+          <td style="font-size:12px;">${capDisplay}</td>
+          <td style="font-size:12px;">${vcDisplay}</td>
         </tr>`;
       });
 

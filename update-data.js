@@ -122,7 +122,7 @@
   const fixtures = await apiFetch("feed/tour-fixtures");
   const allMatches = fixtures?.Data?.Value || [];
   const completedOrLive = allMatches
-    .filter(m => m.MatchStatus === 2 || m.MatchStatus === 1)
+    .filter(m => m.MatchStatus === 2 || m.MatchStatus === 1 || m.MatchStatus === 3 || m.MatchStatus === 5)
     .sort((a, b) => a.TourGamedayId - b.TourGamedayId);
   const gamedayIds = [...new Set(completedOrLive.map(m => m.TourGamedayId))].sort((a, b) => a - b);
   log(`Found ${gamedayIds.length} completed/live matches: GD ${gamedayIds.join(", ")}`);
@@ -139,6 +139,7 @@
       matchName: `${m.HomeTeamShortName} vs ${m.AwayTeamShortName}`,
       matchDate: m.Matchdate?.split("T")[0] || null,
       isLive: m.MatchStatus === 1,
+      isAbandoned: m.MatchStatus === 5 || m.IsGDAbandoned === "1",
       phaseId: m.PhaseId || null,
       homeTeamId: m.HomeTeamId,
       awayTeamId: m.AwayTeamId,
@@ -264,6 +265,7 @@
           gdPoints: playsInThisMatch ? (p.GamedayPoints || 0) : 0,
           isOverseas: p.IS_FP === 1 || p.IS_FP === '1' || p.Is_FP === 1 || p.is_fp === 1,
           teamId: p.TeamId,
+          isAnnounced: p.IsAnnounced || 0,
         };
       });
       // Save for transfer efficiency (step 5b will skip this GD since it's already populated)
@@ -340,16 +342,15 @@
     );
     const allPlayers = playersResp?.Data?.Value?.Players || [];
 
-    // For live matches, filter player points by match teams (same fix as step 3b)
+    // Filter player points by match teams (prevents cross-match point bleed)
     const mi = matchInfo[gd];
     const matchTeamIds = new Set();
     if (mi?.homeTeamId) matchTeamIds.add(mi.homeTeamId);
     if (mi?.awayTeamId) matchTeamIds.add(mi.awayTeamId);
-    const isLiveGd = fallbackGds.includes(gd);
 
     const pmap = {};
     allPlayers.forEach(p => {
-      const playsInThisMatch = !isLiveGd || matchTeamIds.size === 0 || matchTeamIds.has(p.TeamId);
+      const playsInThisMatch = matchTeamIds.size === 0 || matchTeamIds.has(p.TeamId);
       pmap[p.Id] = {
         name: p.Name,
         gdPoints: playsInThisMatch ? (p.GamedayPoints || 0) : 0,
@@ -357,12 +358,12 @@
         countryCode: p.CountryCode || p.Nationality || null,
         skillId: p.SkillId || p.Skill || null,
         teamId: p.TeamId,
+        isAnnounced: p.IsAnnounced || 0,
       };
     });
     playerDataByGd[gd] = pmap;
-    log(`  ${allPlayers.length} players loaded for GD${gd}${isLiveGd ? ` (filtered to ${mi?.matchName})` : ''}`);
+    log(`  ${allPlayers.length} players loaded for GD${gd} (filtered to ${mi?.matchName})`);
 
-    // Log sample player to show available fields (first time only)
     if ([...boosterGds][0] === gd && allPlayers.length > 0) {
       log(`  Sample player keys: ${Object.keys(allPlayers[0]).join(', ')}`);
     }
@@ -546,16 +547,16 @@
     const matchTeamIds = new Set();
     if (mi?.homeTeamId) matchTeamIds.add(mi.homeTeamId);
     if (mi?.awayTeamId) matchTeamIds.add(mi.awayTeamId);
-    const isLiveGd = fallbackGds.includes(gd);
 
     const pmap = {};
     allPlayers.forEach(p => {
-      const playsInThisMatch = !isLiveGd || matchTeamIds.size === 0 || matchTeamIds.has(p.TeamId);
+      const playsInThisMatch = matchTeamIds.size === 0 || matchTeamIds.has(p.TeamId);
       pmap[p.Id] = {
         name: p.Name,
         gdPoints: playsInThisMatch ? (p.GamedayPoints || 0) : 0,
         isOverseas: p.IS_FP === 1 || p.IS_FP === '1' || p.Is_FP === 1 || p.is_fp === 1,
         teamId: p.TeamId,
+        isAnnounced: p.IsAnnounced || 0,
       };
     });
     playerDataByGd[gd] = pmap;
@@ -600,7 +601,7 @@
   };
 
   for (const gd of gamedayIds) {
-    const mi = matchInfo[gd] || { matchName: `Match ${gd}`, matchDate: null, isLive: false };
+    const mi = matchInfo[gd] || { matchName: `Match ${gd}`, matchDate: null, isLive: false, isAbandoned: false };
 
     members.forEach(m => {
       cumulative[m.teamName] += teamData[m.teamName]?.gdPtsMap?.[gd] || 0;
@@ -656,6 +657,20 @@
           lastRealSquad[m.teamName] = currentSquad;
         }
 
+        // Determine captain/VC playing status from player data (not overall-get which is context-dependent)
+        const gdPlayerData = playerDataByGd[gd] || {};
+        const matchTeamIds = new Set();
+        if (mi.homeTeamId) matchTeamIds.add(mi.homeTeamId);
+        if (mi.awayTeamId) matchTeamIds.add(mi.awayTeamId);
+
+        function getPlayerStatus(playerId) {
+          const p = gdPlayerData[playerId];
+          if (!p || matchTeamIds.size === 0) return "playing";
+          if (!matchTeamIds.has(p.teamId)) return "not_playing";
+          if (p.isAnnounced === 2 || p.isAnnounced === "S") return "impact";
+          return "playing";
+        }
+
         return {
           teamName: m.teamName,
           teamId: m.teamId,
@@ -663,7 +678,9 @@
           gamedayPoints: gdPts,
           totalPoints: cumulative[m.teamName],
           captain: td.captain || null,
+          captainStatus: getPlayerStatus(td.captainId),
           viceCaptain: td.viceCaptain || null,
+          viceCaptainStatus: getPlayerStatus(td.viceCaptainId),
           boosterId: td.boosterId || null,
           boosterPoints: bm ? bm.boosterPoints : null,
           subsUsed: td.subsUsed ?? null,
@@ -688,6 +705,7 @@
       matchName: mi.matchName,
       matchDate: mi.matchDate,
       isLive: mi.isLive,
+      isAbandoned: mi.isAbandoned || false,
       isEstimated: fallbackGds.includes(gd),
       scoresAsOf: fallbackTimestamps[gd] || null,
       leaderboard: ranked,
