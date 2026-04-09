@@ -24,16 +24,16 @@
     }
     header {
       background: linear-gradient(135deg, #1a1d28 0%, #2d1b69 100%);
-      padding: 24px 32px;
+      padding: 14px 32px;
       border-bottom: 1px solid var(--border);
     }
     header h1 {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
-    header p { color: var(--text-dim); font-size: 14px; }
-    .container { max-width: 1800px; margin: 0 auto; padding: 24px; }
+    header p { color: var(--text-dim); font-size: 13px; }
+    .container { max-width: 1800px; margin: 0 auto; padding: 14px 24px; }
 
     /* Upload Zone */
     .upload-zone {
@@ -91,24 +91,24 @@
     .stats-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
+      gap: 12px;
+      margin-bottom: 14px;
     }
     .stat-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 16px;
+      padding: 10px 16px;
     }
     .stat-card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+    .stat-card .value { font-size: 24px; font-weight: 700; margin-top: 2px; }
 
     .chart-section {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 24px;
+      padding: 16px 24px;
+      margin-bottom: 16px;
     }
     .chart-section h3 {
       font-size: 16px;
@@ -200,8 +200,8 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 24px;
+      padding: 16px 24px;
+      margin-bottom: 16px;
       overflow-x: auto;
     }
     table {
@@ -240,7 +240,7 @@
       background: var(--bg);
       border-radius: 8px;
       padding: 4px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       width: fit-content;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -434,7 +434,7 @@
             <h3 style="margin:0;">Per-Match Leaderboard</h3>
             <select id="matchSelect" onchange="showSelectedMatch()" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;min-width:220px;">
             </select>
-            <span style="font-size:13px;font-weight:600;opacity:0.95;white-space:nowrap;margin-left:auto;margin-right:80px;">C/VC: <span style="color:#e74c3c;">⚠️ Not in match</span> &nbsp;|&nbsp; <span style="color:#f39c12;">🔄 Impact player</span></span>
+            <span style="font-size:13px;font-weight:600;opacity:0.95;white-space:nowrap;margin-left:auto;margin-right:80px;">Rank: <span class="rank-up">▲ moved up</span> <span class="rank-down">▼ moved down</span> vs prev match &nbsp;|&nbsp; C/VC: <span style="color:#e74c3c;">⚠️ Not in match</span> &nbsp;|&nbsp; <span style="color:#f39c12;">🔄 Impact player</span></span>
           </div>
           <div id="matchLeaderboards"></div>
         </div>
@@ -1203,10 +1203,20 @@
       if (!gd) return;
       const colorMap = matchLbData.memberColorMap;
 
+      // Build previous gameday rank lookup
+      const prevGd = gdIdx > 0 ? matchLbData.gamedays[gdIdx - 1] : null;
+      const prevRankMap = {};
+      if (prevGd) {
+        prevGd.leaderboard.forEach(e => {
+          prevRankMap[e.teamName || e.temname] = e.rank || 999;
+        });
+      }
+
       const matchRanking = gd.leaderboard
         .map(entry => ({
           name: entry.teamName || entry.temname,
           gdPts: entry.gamedayPoints || 0,
+          overallRank: entry.rank || null,
           captain: entry.captain || '—',
           captainStatus: entry.captainStatus || 'playing',
           viceCaptain: entry.viceCaptain || '—',
@@ -1248,8 +1258,16 @@
         const boosterSummary = boosterUsers.map(e => `<strong style="color:${colorMap[e.name] || '#fff'}">${e.name}</strong> used ${boosterLabel(e.boosterId)}`).join(' &nbsp;|&nbsp; ');
         html += `<p class="subtitle" style="margin-bottom:6px;">🔥 Boosters: ${boosterSummary}</p>`;
       }
+      // Dynamic rank column header — matches Standings tab style
+      const prevMatchId = prevGd ? prevGd.gamedayId : null;
+      const prevMatchName = prevGd ? (prevGd.matchName || '') : '';
+      const rankColHeader = prevMatchId != null ? `Since M${prevMatchId}` : (gd.isLive || gd.isEstimated) ? `Current Rank` : `Rank after M${gd.gamedayId}`;
+      const rankColTooltip = prevMatchId != null
+        ? `Rank change compared to position after M${prevMatchId}`
+        : `Overall league rank after this match`;
+
       html += `<table><thead><tr>`;
-      html += `<th style="text-align:center;">#</th><th style="text-align:left;">Team</th><th style="text-align:left;width:180px;">Match Pts</th><th style="text-align:center;">Transfers</th><th style="text-align:center;">Booster</th><th style="text-align:left;">Captain</th><th style="text-align:left;">Vice Captain</th>`;
+      html += `<th style="text-align:center;">#</th><th style="text-align:left;">Team</th><th style="text-align:left;width:180px;">Match Pts</th><th style="text-align:center;" title="${rankColTooltip}">${rankColHeader}</th><th style="text-align:center;">Transfers</th><th style="text-align:center;">Booster</th><th style="text-align:left;">Captain</th><th style="text-align:left;">Vice Captain</th>`;
       html += `</tr></thead><tbody>`;
 
       matchRanking.forEach((entry, pos) => {
@@ -1264,6 +1282,20 @@
         const capDisplay = formatPlayerStatus(entry.captain, entry.captainStatus);
         const vcDisplay = formatPlayerStatus(entry.viceCaptain, entry.viceCaptainStatus);
 
+        // Overall rank change from previous match
+        let rankChangeHtml = '';
+        if (entry.overallRank != null && prevGd) {
+          const prev = prevRankMap[entry.name];
+          if (prev != null) {
+            const diff = prev - entry.overallRank;
+            if (diff > 0) rankChangeHtml = `<span class="rank-up" title="Up ${diff} position${diff > 1 ? 's' : ''} compared to position after M${prevGd.gamedayId}">▲${diff}</span>`;
+            else if (diff < 0) rankChangeHtml = `<span class="rank-down" title="Down ${Math.abs(diff)} position${Math.abs(diff) > 1 ? 's' : ''} compared to position after M${prevGd.gamedayId}">▼${Math.abs(diff)}</span>`;
+          }
+        }
+        const overallRankDisplay = entry.overallRank != null
+          ? `${entry.overallRank}${rankChangeHtml ? ' &nbsp;' + rankChangeHtml : ''}`
+          : '—';
+
         html += `<tr>
           <td style="font-weight:700;text-align:center;">${medal}</td>
           <td><span class="dot" style="background:${color};margin-right:8px;"></span>${entry.name}</td>
@@ -1275,6 +1307,7 @@
               </div>
             </div>
           </td>
+          <td style="text-align:center;white-space:nowrap;">${overallRankDisplay}</td>
           <td style="text-align:center;">${entry.transfers}</td>
           <td style="text-align:center;">${boosterBadge}</td>
           <td style="font-size:12px;">${capDisplay}</td>
@@ -1304,10 +1337,20 @@
     function renderTable(gamedays, members) {
       const hasLive = gamedays.some(gd => gd.isEstimated || gd.isLive);
       const star = hasLive ? '<span style="color:#fdcb6e;" title="Includes live match — not final">*</span>' : '';
-      let html = '<p class="subtitle" style="margin-bottom:16px;">Rank change is compared to Match 1 standings (baseline)' + (hasLive ? ' &nbsp;<span style="color:#fdcb6e;font-size:12px;">* includes live match estimates</span>' : '') + '</p>';
+      let html = hasLive ? '<p class="subtitle" style="margin-bottom:16px;"><span style="color:#fdcb6e;font-size:12px;">* includes live match estimates</span></p>' : '';
+      // Figure out the previous match ID for the "Since M__" column header
+      const lastGdId = gamedays.length > 0 ? gamedays[gamedays.length - 1].gamedayId : null;
+      const prevGdIdx = gamedays.length > 1 ? gamedays.length - 2 : null;
+      const prevGdId = prevGdIdx != null ? gamedays[prevGdIdx].gamedayId : null;
+      const prevGdName = prevGdIdx != null ? (gamedays[prevGdIdx].matchName || '') : '';
+      const sinceLabel = prevGdId != null ? `Since M${prevGdId}` : 'Since Last';
+      const sinceTooltip = prevGdId != null
+        ? `Rank change compared to position after M${prevGdId}`
+        : 'Rank change compared to previous match';
+
       html += '<table><thead><tr>';
-      html += '<th>#</th><th>Team</th><th>Points</th><th>Rank (M1→Now)</th>';
-      html += '<th>Transfers Left</th><th>Boosters Used</th><th>Best Rank</th><th>Worst Rank</th>';
+      html += `<th style="text-align:center;">#</th><th>Team</th><th>Points</th><th style="text-align:center;">Rank (M1→Now)</th><th style="text-align:center;" title="${sinceTooltip}">${sinceLabel}</th>`;
+      html += '<th style="text-align:center;">Transfers Left</th><th style="text-align:center;">Boosters Used</th><th style="text-align:center;">Best Rank</th><th style="text-align:center;">Worst Rank</th>';
       html += '</tr></thead><tbody>';
 
       members.forEach(([name, data], i) => {
@@ -1324,7 +1367,17 @@
           const diff = firstRank - currentRank;
           if (diff > 0) changeHtml = `<span class="rank-up">#${firstRank} → #${currentRank} ▲${diff}</span>`;
           else if (diff < 0) changeHtml = `<span class="rank-down">#${firstRank} → #${currentRank} ▼${Math.abs(diff)}</span>`;
-          else changeHtml = `<span class="rank-same">#${firstRank} → #${currentRank} ●0</span>`;
+          else changeHtml = `<span class="rank-same">#${firstRank} → #${currentRank}</span>`;
+        }
+
+        // Rank change since last match
+        let lastMatchHtml = '<span class="rank-same">—</span>';
+        if (validRanks.length > 1) {
+          const prevRank = validRanks[validRanks.length - 2];
+          const diff = prevRank - currentRank;
+          if (diff > 0) lastMatchHtml = `<span class="rank-up">▲${diff}</span>`;
+          else if (diff < 0) lastMatchHtml = `<span class="rank-down">▼${Math.abs(diff)}</span>`;
+          else lastMatchHtml = `<span class="rank-same">—</span>`;
         }
 
         // Booster count and transfers
@@ -1337,24 +1390,30 @@
 
         const color = COLORS[i % COLORS.length];
         html += `<tr>
-          <td><span style="color:${color};font-weight:700;">${currentRank}</span></td>
+          <td style="text-align:center;"><span style="color:${color};font-weight:700;">${currentRank}</span></td>
           <td><span class="dot" style="background:${color};margin-right:8px;"></span>${name}</td>
           <td>${currentPts}${star}</td>
-          <td>${changeHtml}</td>
+          <td style="text-align:center;">${changeHtml}</td>
+          <td style="text-align:center;">${lastMatchHtml}</td>
           <td style="text-align:center;">${subsHtml}</td>
           <td style="text-align:center;">${boosterHtml}</td>
-          <td>${bestRank}</td>
-          <td>${worstRank}</td>
+          <td style="text-align:center;">${bestRank}</td>
+          <td style="text-align:center;">${worstRank}</td>
         </tr>`;
       });
 
       html += '</tbody></table>';
       document.getElementById('standingsTable').innerHTML = html;
-      const completedInStandings = gamedays.filter(gd => !gd.isEstimated && !gd.isLive).length;
-      const liveInStandings = gamedays.length - completedInStandings;
-      const headingText = liveInStandings > 0
-        ? `Current Standings (${completedInStandings} Completed + ${liveInStandings} Live)`
-        : `Current Standings (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})`;
+      const completedInStandings = gamedays.filter(gd => !gd.isEstimated && !gd.isLive);
+      const liveInStandings = gamedays.filter(gd => gd.isEstimated || gd.isLive);
+      const lastGd = gamedays.length > 0 ? gamedays[gamedays.length - 1] : null;
+      const lastMatchName = lastGd ? (lastGd.matchName || '') : '';
+      let headingText;
+      if (liveInStandings.length > 0) {
+        headingText = `Current Standings (${completedInStandings.length} Completed + ${liveInStandings.length} Live)`;
+      } else {
+        headingText = `Current Standings (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})` + (lastMatchName ? `, ${lastMatchName}` : '');
+      }
       document.getElementById('standingsHeading').textContent = headingText;
     }
 
@@ -1407,13 +1466,13 @@
       }
 
       const hasLive = gamedays.some(gd => gd.isEstimated || gd.isLive);
-      const completedCount = gamedays.filter(gd => !gd.isEstimated && !gd.isLive).length;
+      const completedGds = gamedays.filter(gd => !gd.isEstimated && !gd.isLive);
+      const completedCount = completedGds.length;
       const liveCount = gamedays.length - completedCount;
+      const lastPrizeGd = gamedays.length > 0 ? gamedays[gamedays.length - 1] : null;
+      const lastPrizeMatchName = lastPrizeGd ? (lastPrizeGd.matchName || '') : '';
       const star = hasLive ? '<span style="color:#fdcb6e;" title="Includes live match — not final">*</span>' : '';
-      const matchSuffix = hasLive
-        ? `${completedCount} completed + ${liveCount} live`
-        : `${gamedays.length} match${gamedays.length !== 1 ? 'es' : ''}`;
-      let html = `<p class="subtitle" style="margin-bottom:16px;">Prize pool: $900 (12 × $75). After ${matchSuffix}.${hasLive ? ' <span style="color:#fdcb6e;font-size:12px;">* includes live match estimates</span>' : ''}</p>`;
+      let html = `<p class="subtitle" style="margin-bottom:16px;">Prize pool: $900 (12 × $75).${hasLive ? ' <span style="color:#fdcb6e;font-size:12px;">* includes live match estimates</span>' : ''}</p>`;
 
       // Use a 2-column grid for the prize cards
       html += `<div class="prize-grid-responsive" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
@@ -1479,7 +1538,13 @@
       html += `</div>`; // close grid
 
       document.getElementById('prizesContent').innerHTML = html;
-      document.getElementById('prizesHeading').textContent = `Prize Contenders (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})`;
+      let prizesHeadingText;
+      if (liveCount > 0) {
+        prizesHeadingText = `Prize Contenders (${completedCount} Completed + ${liveCount} Live)`;
+      } else {
+        prizesHeadingText = `Prize Contenders (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})` + (lastPrizeMatchName ? `, ${lastPrizeMatchName}` : '');
+      }
+      document.getElementById('prizesHeading').textContent = prizesHeadingText;
     }
 
     // ---- Rank Heatmap ----
