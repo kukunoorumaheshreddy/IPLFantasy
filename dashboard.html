@@ -504,17 +504,23 @@
   </div>
 
   <script>
-    // ---- Color palette ----
-    const COLORS = [
-      '#6c5ce7','#00b894','#e17055','#0984e3','#fdcb6e','#e84393',
-      '#f78fb3','#d63031','#a29bfe','#3d3d3d','#fab1a0','#74b9ff',
-      '#ffeaa7','#fd79a8','#81ecec','#ff7675','#636e72','#dfe6e9',
-      '#b2bec3','#2d3436','#f8a5c2','#778beb','#cf6a87','#786fa6',
-      '#f19066','#f5cd79','#546de5','#e15f41','#c44569','#574b90',
-    ];
+    // ---- Fixed team color map (frozen after M15) ----
+    const TEAM_COLOR_MAP = {
+      'Deccan Tifosi':    '#6c5ce7',
+      'Karth Vader XI':   '#00b894',
+      'WindyCityWarriors': '#e17055',
+      'AVB':              '#0984e3',
+      'The Defiant Wall': '#fdcb6e',
+      'Master of Universe': '#e84393',
+      'Chi Team':         '#f78fb3',
+      'Aamchi Mumbhais':  '#d63031',
+      'Aaya Sher XI':     '#a29bfe',
+      'Dakkhani Zaika':   '#2ed573',
+      'Faaaaaaaahhhhhh':  '#fab1a0',
+      'Run2Win':          '#74b9ff',
+    };
 
-    // Stable team→color map: assigned once per data load, used everywhere
-    let teamColorMap = {}; // teamName -> color
+    let teamColorMap = { ...TEAM_COLOR_MAP };
     function getTeamColor(name) { return teamColorMap[name] || '#8b8fa3'; }
 
     const BOOSTER_NAMES = {
@@ -770,11 +776,8 @@
       // Sort standings members by latest rank (includes live)
       const standingsMembers = sortMembers(standingsMemberMap);
 
-      // Assign stable colors based on completed-match rank order (canonical)
-      teamColorMap = {};
-      members.forEach(([name], i) => { teamColorMap[name] = COLORS[i % COLORS.length]; });
-      // Ensure any team only in standings (shouldn't happen) also gets a color
-      standingsMembers.forEach(([name], i) => { if (!teamColorMap[name]) teamColorMap[name] = COLORS[i % COLORS.length]; });
+      // Use fixed team color map (no reassignment needed)
+      teamColorMap = { ...TEAM_COLOR_MAP };
 
       // Initialize all as visible
       visibleTeams = new Set(members.map(([name]) => name));
