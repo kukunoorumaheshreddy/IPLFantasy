@@ -436,6 +436,9 @@
             </select>
             <span style="font-size:13px;font-weight:600;opacity:0.95;white-space:nowrap;margin-left:auto;margin-right:80px;">Rank: <span class="rank-up">▲ moved up</span> <span class="rank-down">▼ moved down</span> vs prev match &nbsp;|&nbsp; C/VC: <span style="color:#e74c3c;">⚠️ Not in match</span> &nbsp;|&nbsp; <span style="color:#f39c12;">🔄 Impact player</span></span>
           </div>
+          <div id="playerDataNote" style="text-align:right;margin-right:80px;display:none;">
+            <span style="font-size:12px;color:var(--muted);opacity:0.8;">ℹ️ Player list and scores are shown for last 2 completed + live matches only</span>
+          </div>
           <div id="matchLeaderboards"></div>
         </div>
       </div>
@@ -1270,7 +1273,6 @@
         html += `<p style="margin-bottom:8px;"><span style="background:#27ae60;color:#fff;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">✅ COMPLETED</span></p>`;
       }
 
-      html += `<p class="subtitle" style="margin-bottom:6px;">🏆 Best:<strong style="color:${colorMap[best.name] || '#fff'}">${best.name}</strong> (${best.gdPts} pts) &nbsp;|&nbsp; Lowest: <strong style="color:${colorMap[worst.name] || '#fff'}">${worst.name}</strong> (${worst.gdPts} pts)</p>`;
       if (boosterUsers.length > 0) {
         const boosterSummary = boosterUsers.map(e => `<strong style="color:${colorMap[e.name] || '#fff'}">${e.name}</strong> used ${boosterLabel(e.boosterId)}`).join(' &nbsp;|&nbsp; ');
         html += `<p class="subtitle" style="margin-bottom:6px;">🔥 Boosters: ${boosterSummary}</p>`;
@@ -1342,6 +1344,11 @@
       });
 
       html += `</tbody></table>`;
+
+      // Show info note only when player scores are not available for this match
+      const hasPlayerData = matchRanking.some(e => e.captainPts != null || e.activePlayers.length > 0);
+      document.getElementById('playerDataNote').style.display = hasPlayerData ? 'none' : 'block';
+
       document.getElementById('matchLeaderboards').innerHTML = html;
     }
 
