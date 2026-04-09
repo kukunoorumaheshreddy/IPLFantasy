@@ -1261,7 +1261,7 @@
       // Dynamic rank column header — matches Standings tab style
       const prevMatchId = prevGd ? prevGd.gamedayId : null;
       const prevMatchName = prevGd ? (prevGd.matchName || '') : '';
-      const rankColHeader = prevMatchId != null ? `Since M${prevMatchId}` : (gd.isLive || gd.isEstimated) ? `Current Rank` : `Rank after M${gd.gamedayId}`;
+      const rankColHeader = prevMatchId != null ? `Overall Rank / Since M${prevMatchId}` : (gd.isLive || gd.isEstimated) ? `Current Rank` : `Rank after M${gd.gamedayId}`;
       const rankColTooltip = prevMatchId != null
         ? `Rank change compared to position after M${prevMatchId}`
         : `Overall league rank after this match`;
