@@ -600,6 +600,16 @@
     ),
   };
 
+  // Determine which gamedays include per-player details (C/VC pts, active players)
+  // Rule: last completed match + all live matches
+  const liveGdSet = new Set(gamedayIds.filter(g => matchInfo[g]?.isLive));
+  const completedGdList = gamedayIds.filter(g => !matchInfo[g]?.isLive);
+  const lastCompleted = liveGdSet.size > 0
+    ? completedGdList.slice(-1)   // 1 completed when live matches exist
+    : completedGdList.slice(-2);  // 2 completed when nothing is live
+  const playerDetailGds = new Set([...liveGdSet, ...lastCompleted]);
+  log(`Including player details for GDs: ${[...playerDetailGds].join(', ')}`);
+
   for (const gd of gamedayIds) {
     const mi = matchInfo[gd] || { matchName: `Match ${gd}`, matchDate: null, isLive: false, isAbandoned: false };
 
@@ -671,14 +681,14 @@
           return "playing";
         }
 
-        // Only include per-player points for live matches (saves JSON size)
-        const isLiveGd = mi.isLive || mi.isEstimated;
+        // Include per-player points for last completed match + all live matches
+        const includePlayerDetails = playerDetailGds.has(gd);
 
         // Calculate captain/VC effective points
         const capPlayer = gdPlayerData[td.captainId];
         const vcPlayer = gdPlayerData[td.viceCaptainId];
         function calcPlayerPts(p, isCaptain, isVC) {
-          if (!isLiveGd || !p) return null;
+          if (!includePlayerDetails || !p) return null;
           const base = p.gdPoints || 0;
           const roleMult = isCaptain ? 2 : isVC ? 1.5 : 1;
           let boosterMult = 1;
@@ -701,7 +711,7 @@
           viceCaptain: td.viceCaptain || null,
           viceCaptainStatus: getPlayerStatus(td.viceCaptainId),
           viceCaptainPts: calcPlayerPts(vcPlayer, false, true),
-          activePlayers: isLiveGd ? (td.squad || [])
+          activePlayers: includePlayerDetails ? (td.squad || [])
             .filter(pid => pid !== td.captainId && pid !== td.viceCaptainId)
             .filter(pid => { const p = gdPlayerData[pid]; return p && matchTeamIds.has(p.teamId); })
             .map(pid => {
