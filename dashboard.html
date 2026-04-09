@@ -507,11 +507,15 @@
     // ---- Color palette ----
     const COLORS = [
       '#6c5ce7','#00b894','#e17055','#0984e3','#fdcb6e','#e84393',
-      '#00cec9','#d63031','#a29bfe','#55efc4','#fab1a0','#74b9ff',
+      '#f78fb3','#d63031','#a29bfe','#3d3d3d','#fab1a0','#74b9ff',
       '#ffeaa7','#fd79a8','#81ecec','#ff7675','#636e72','#dfe6e9',
       '#b2bec3','#2d3436','#f8a5c2','#778beb','#cf6a87','#786fa6',
       '#f19066','#f5cd79','#546de5','#e15f41','#c44569','#574b90',
     ];
+
+    // Stable team→color map: assigned once per data load, used everywhere
+    let teamColorMap = {}; // teamName -> color
+    function getTeamColor(name) { return teamColorMap[name] || '#8b8fa3'; }
 
     const BOOSTER_NAMES = {
       3: '⚡ Double Power',
@@ -766,6 +770,12 @@
       // Sort standings members by latest rank (includes live)
       const standingsMembers = sortMembers(standingsMemberMap);
 
+      // Assign stable colors based on completed-match rank order (canonical)
+      teamColorMap = {};
+      members.forEach(([name], i) => { teamColorMap[name] = COLORS[i % COLORS.length]; });
+      // Ensure any team only in standings (shouldn't happen) also gets a color
+      standingsMembers.forEach(([name], i) => { if (!teamColorMap[name]) teamColorMap[name] = COLORS[i % COLORS.length]; });
+
       // Initialize all as visible
       visibleTeams = new Set(members.map(([name]) => name));
 
@@ -853,7 +863,7 @@
       const container = document.getElementById(containerId);
       let html = '<label>Teams:</label>';
       members.forEach(([name], i) => {
-        const color = COLORS[i % COLORS.length];
+        const color = getTeamColor(name);
         html += `<button class="toggle-btn active" data-team="${name}" onclick="toggleTeam('${name.replace(/'/g, "\\'")}')" style="border-color:${color}">
           <span class="dot" style="background:${color}"></span>${name}
         </button>`;
@@ -928,12 +938,12 @@
       const datasets = members.map(([name, data], i) => ({
         label: name,
         data: data.ranks,
-        borderColor: COLORS[i % COLORS.length],
-        backgroundColor: COLORS[i % COLORS.length] + '33',
+        borderColor: getTeamColor(name),
+        backgroundColor: getTeamColor(name) + '33',
         borderWidth: 3.5,
         pointRadius: 7,
         pointHoverRadius: 11,
-        pointBackgroundColor: COLORS[i % COLORS.length],
+        pointBackgroundColor: getTeamColor(name),
         pointBorderColor: '#1a1d28',
         pointBorderWidth: 2,
         tension: 0.35,
@@ -954,7 +964,7 @@
             const hIdx = elems.length > 0 ? elems[0].datasetIndex : null;
             chart.data.datasets.forEach((ds, i) => {
               if (ds.hidden) return;
-              const base = COLORS[i % COLORS.length];
+              const base = getTeamColor(ds.label);
               if (hIdx === null) {
                 ds.borderWidth = 3.5; ds.pointRadius = 7;
                 ds.borderColor = base; ds.pointBackgroundColor = base;
@@ -999,7 +1009,7 @@
       rankChart.canvas.addEventListener('mouseleave', () => {
         rankChart.data.datasets.forEach((ds, i) => {
           if (ds.hidden) return;
-          const base = COLORS[i % COLORS.length];
+          const base = getTeamColor(ds.label);
           ds.borderWidth = 3.5; ds.pointRadius = 7;
           ds.borderColor = base; ds.pointBackgroundColor = base;
         });
@@ -1016,7 +1026,7 @@
       // Build legend
       let legHtml = '';
       members.forEach(([name], i) => {
-        const c = COLORS[i % COLORS.length];
+        const c = getTeamColor(name);
         legHtml += `<span style="display:inline-flex;align-items:center;gap:4px;font-size:13px;"><span style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block;"></span>${name}</span>`;
       });
       document.getElementById('ptsAnimLegend').innerHTML = legHtml;
@@ -1082,7 +1092,7 @@
       // Draw each team's line
       members.forEach(([name, data], mi) => {
         const pts = data.points;
-        const color = COLORS[mi % COLORS.length];
+        const color = getTeamColor(name);
         ctx.strokeStyle = color;
         ctx.lineWidth = 2.5;
         ctx.lineJoin = 'round';
@@ -1147,7 +1157,7 @@
           const pts = data.points;
           const last = pts[pts.length - 1];
           if (last == null) return;
-          labelData.push({ name, last, y: toY(last), color: COLORS[mi % COLORS.length] });
+          labelData.push({ name, last, y: toY(last), color: getTeamColor(name) });
         });
         // Sort by Y position and nudge overlapping labels apart
         labelData.sort((a, b) => a.y - b.y);
@@ -1178,8 +1188,7 @@
     let matchLbData = null; // stored for dropdown re-render
 
     function renderMatchLeaderboard(gamedays, members) {
-      const memberColorMap = {};
-      members.forEach(([name], i) => { memberColorMap[name] = COLORS[i % COLORS.length]; });
+      const memberColorMap = teamColorMap;
       matchLbData = { gamedays, memberColorMap };
 
       // Populate dropdown (latest match first)
@@ -1273,7 +1282,11 @@
       matchRanking.forEach((entry, pos) => {
         const color = colorMap[entry.name] || '#8b8fa3';
         const medal = pos === 0 ? '🥇' : pos === 1 ? '🥈' : pos === 2 ? '🥉' : `${pos + 1}`;
-        const barWidth = best.gdPts > 0 ? Math.round((entry.gdPts / best.gdPts) * 100) : 0;
+        // Scale bars proportionally: worst gets 15%, best gets 100%
+        const range = best.gdPts - worst.gdPts;
+        const barWidth = range > 0
+          ? Math.round(15 + ((entry.gdPts - worst.gdPts) / range) * 85)
+          : 100;
 
         const boosterBadge = entry.boosterId
           ? `<span style="background:#ff9f43;color:#000;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">${boosterLabel(entry.boosterId)}</span>`
@@ -1349,7 +1362,7 @@
         : 'Rank change compared to previous match';
 
       html += '<table><thead><tr>';
-      html += `<th style="text-align:center;">#</th><th>Team</th><th>Points</th><th style="text-align:center;">Rank (M1→Now)</th><th style="text-align:center;" title="${sinceTooltip}">${sinceLabel}</th>`;
+      html += `<th style="text-align:center;">#</th><th>Team</th><th>Points</th><th style="text-align:center;" title="${sinceTooltip}">${sinceLabel}</th><th style="text-align:center;">Since M1</th>`;
       html += '<th style="text-align:center;">Transfers Left</th><th style="text-align:center;">Boosters Used</th><th style="text-align:center;">Best Rank</th><th style="text-align:center;">Worst Rank</th>';
       html += '</tr></thead><tbody>';
 
@@ -1365,9 +1378,8 @@
         let changeHtml = '<span class="rank-same">—</span>';
         if (firstRank != null && currentRank !== '—' && validRanks.length > 1) {
           const diff = firstRank - currentRank;
-          if (diff > 0) changeHtml = `<span class="rank-up">#${firstRank} → #${currentRank} ▲${diff}</span>`;
-          else if (diff < 0) changeHtml = `<span class="rank-down">#${firstRank} → #${currentRank} ▼${Math.abs(diff)}</span>`;
-          else changeHtml = `<span class="rank-same">#${firstRank} → #${currentRank}</span>`;
+          if (diff > 0) changeHtml = `<span class="rank-up">▲${diff}</span>`;
+          else if (diff < 0) changeHtml = `<span class="rank-down">▼${Math.abs(diff)}</span>`;
         }
 
         // Rank change since last match
@@ -1388,13 +1400,13 @@
           ? `${data.subsLeft}/${data.subsTotal}`
           : data.subsLeft != null ? `${data.subsLeft}` : '—';
 
-        const color = COLORS[i % COLORS.length];
+        const color = getTeamColor(name);
         html += `<tr>
           <td style="text-align:center;"><span style="color:${color};font-weight:700;">${currentRank}</span></td>
           <td><span class="dot" style="background:${color};margin-right:8px;"></span>${name}</td>
           <td>${currentPts}${star}</td>
-          <td style="text-align:center;">${changeHtml}</td>
           <td style="text-align:center;">${lastMatchHtml}</td>
+          <td style="text-align:center;">${changeHtml}</td>
           <td style="text-align:center;">${subsHtml}</td>
           <td style="text-align:center;">${boosterHtml}</td>
           <td style="text-align:center;">${bestRank}</td>
@@ -1421,8 +1433,7 @@
     function renderPrizes(gamedays, members, data, completedGdIds) {
       const CARD = 'background:linear-gradient(135deg,#2a2d3a,#1a1d28);border:1px solid var(--border);border-radius:12px;padding:16px;';
       const MEDAL = ['🥇','🥈','🥉'];
-      const memberColorMap = {};
-      members.forEach(([name], i) => { memberColorMap[name] = COLORS[i % COLORS.length]; });
+      const memberColorMap = teamColorMap;
 
       const allMembers = members;
       const leaderPts = allMembers[0]?.[1].points.filter(p => p != null).pop() || 0;
@@ -1573,7 +1584,7 @@
       html += '</tr></thead><tbody>';
 
       members.forEach(([name, data], mi) => {
-        const color = COLORS[mi % COLORS.length];
+        const color = getTeamColor(name);
         const boosterCount = (data.boosters || []).filter(b => b != null).length;
         const subsInfo = data.subsLeft != null ? data.subsLeft : '—';
         html += `<tr><td class="hm-team"><span class="dot" style="background:${color};margin-right:6px;"></span>${name} <span style="font-size:11px;opacity:0.5;margin-left:8px;">TL=${subsInfo}, BU=${boosterCount}</span></td>`;
@@ -1600,8 +1611,7 @@
     function renderTransferHeatmap(gamedays, members) {
       // Build per-team per-gameday transfer data from leaderboard entries
       const teamData = {}; // name -> [ { gd, avg, eff, count, free, isLive } ]
-      const memberColors = {};
-      members.forEach(([name], i) => { memberColors[name] = COLORS[i % COLORS.length]; });
+      const memberColors = teamColorMap;
 
       gamedays.forEach((gd) => {
         gd.leaderboard.forEach(e => {
@@ -1730,8 +1740,7 @@
     const ROW_H = 40; // row height including gap
 
     function initRace(gamedays, members, matchDetails) {
-      const memberColors = {};
-      members.forEach(([name], i) => { memberColors[name] = COLORS[i % COLORS.length]; });
+      const memberColors = teamColorMap;
 
       const snapshots = gamedays.map((gd, gi) => {
         const entries = members.map(([name, data]) => ({
