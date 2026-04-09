@@ -671,6 +671,24 @@
           return "playing";
         }
 
+        // Only include per-player points for live matches (saves JSON size)
+        const isLiveGd = mi.isLive || mi.isEstimated;
+
+        // Calculate captain/VC effective points
+        const capPlayer = gdPlayerData[td.captainId];
+        const vcPlayer = gdPlayerData[td.viceCaptainId];
+        function calcPlayerPts(p, isCaptain, isVC) {
+          if (!isLiveGd || !p) return null;
+          const base = p.gdPoints || 0;
+          const roleMult = isCaptain ? 2 : isVC ? 1.5 : 1;
+          let boosterMult = 1;
+          if (boosterType === 'DOUBLE_POWER') boosterMult = 2;
+          else if (boosterType === 'TRIPLE_CAPTAIN' && isCaptain) boosterMult = 1.5;
+          else if (boosterType === 'INDIAN_WARRIORS' && !p.isOverseas) boosterMult = 2;
+          else if (boosterType === 'FOREIGN_STARS' && p.isOverseas) boosterMult = 2;
+          return Math.round(base * roleMult * boosterMult * 100) / 100;
+        }
+
         return {
           teamName: m.teamName,
           teamId: m.teamId,
@@ -679,8 +697,24 @@
           totalPoints: cumulative[m.teamName],
           captain: td.captain || null,
           captainStatus: getPlayerStatus(td.captainId),
+          captainPts: calcPlayerPts(capPlayer, true, false),
           viceCaptain: td.viceCaptain || null,
           viceCaptainStatus: getPlayerStatus(td.viceCaptainId),
+          viceCaptainPts: calcPlayerPts(vcPlayer, false, true),
+          activePlayers: isLiveGd ? (td.squad || [])
+            .filter(pid => pid !== td.captainId && pid !== td.viceCaptainId)
+            .filter(pid => { const p = gdPlayerData[pid]; return p && matchTeamIds.has(p.teamId); })
+            .map(pid => {
+              const p = gdPlayerData[pid];
+              if (!p) return null;
+              const base = p.gdPoints || 0;
+              let boosterMult = 1;
+              if (boosterType === 'DOUBLE_POWER') boosterMult = 2;
+              else if (boosterType === 'INDIAN_WARRIORS' && !p.isOverseas) boosterMult = 2;
+              else if (boosterType === 'FOREIGN_STARS' && p.isOverseas) boosterMult = 2;
+              return { name: p.name, pts: Math.round(base * boosterMult * 100) / 100 };
+            })
+            .filter(Boolean) : undefined,
           boosterId: td.boosterId || null,
           boosterPoints: bm ? bm.boosterPoints : null,
           subsUsed: td.subsUsed ?? null,
