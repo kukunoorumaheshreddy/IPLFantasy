@@ -35,26 +35,26 @@ Press `F12` (or right-click → Inspect), then click the **Console** tab.
 
 Open [`update-data.js`](https://github.com/kukunoorumaheshreddy/IPLFantasy/blob/main/update-data.js), copy the **entire file**, paste it into the console, and press **Enter**.
 
-### Step 4: Enter your JSONBin API key (first time only)
+### Step 4: Enter your GitHub PAT (first time only)
 
-On your first run, a prompt will ask for the **JSONBin X-Master-Key**. Paste the key (ask Mahesh if you don't have it). It's saved in your browser's localStorage — you won't be asked again.
+On your first run, a prompt will ask for a **GitHub Personal Access Token** with `gist` scope. Paste the token (ask Mahesh if you don't have one). It's saved in your browser's localStorage — you won't be asked again.
 
-> To reset: type `localStorage.removeItem('jsonbin_key')` in the console.
+> To reset: type `localStorage.removeItem('github_pat')` in the console.
 
 ### Step 5: Leave the tab open
 
 The script will:
 1. Fetch data for all 12 league members across all matches (~30-60 seconds)
-2. **Upload to JSONBin** automatically (no file download needed!)
+2. **Upload to GitHub Gist** automatically (no file download needed!)
 3. **Repeat every 5 minutes** until you close the tab
 
 You'll see a log like:
 ```
-✅ Uploaded to JSONBin successfully!
+✅ Uploaded to Gist successfully!
 ⏳ Next update at 4:25:30 PM. Close tab to stop.
 ```
 
-The dashboard auto-refreshes every 60 seconds and picks up the latest data. **No git push needed!**
+The dashboard auto-refreshes every 60 seconds and picks up the latest data from the Gist. **No git push needed!**
 
 ### Console commands
 
@@ -82,8 +82,8 @@ You're not logged in. Go to [fantasy.iplt20.com](https://fantasy.iplt20.com/clas
 ### Chrome says "Don't paste code you don't understand"
 Type `allow pasting` in the console and press Enter. Then paste the script.
 
-### JSONBin upload failed
-Check the console for the error. Most likely your API key is wrong — type `localStorage.removeItem('jsonbin_key')` and re-run the script to re-enter it.
+### Upload failed / Gist error
+Check the console for the error. Most likely your GitHub PAT is wrong or expired — type `localStorage.removeItem('github_pat')` and re-run the script to re-enter it.
 
 ### Script stops updating / red errors after a while
 Your fantasy session expired. Refresh the page, log in again, and re-paste the script.
@@ -104,7 +104,7 @@ Live match scores are estimated from player data. Once a match is finalized, the
 3. For live matches: calculates scores from player data, filtering by teams playing in each fixture
 4. Detects booster usage (FREE_HIT, DOUBLE_POWER, etc.) and calculates bonus points
 5. Builds cumulative rankings, transfer usage, and per-match breakdowns
-6. **Uploads the JSON to JSONBin** (cloud storage) — no file download needed
+6. **Uploads the JSON to a GitHub Gist** (cloud storage) — no file download needed
 7. **Repeats every 5 minutes** until the tab is closed
 
 ### Booster Calculation
@@ -149,7 +149,7 @@ The IPL Fantasy API provides an `IS_FP` (Is Foreign Player) field in the live pl
 This is used by the FOREIGN_STARS and INDIAN_WARRIORS boosters to determine which players get doubled. The script fetches the player data feed only for matches where these nationality-based boosters were activated (to minimize API calls).
 
 ### Dashboard
-Pure HTML + JavaScript — no server, no install. Hosted free on GitHub Pages. Auto-loads data from JSONBin (live cloud data), falls back to `master-snapshots/` repo files if JSONBin is unavailable. **Auto-refreshes every 60 seconds** when loaded from JSONBin.
+Pure HTML + JavaScript — no server, no install. Hosted free on GitHub Pages. Auto-loads data from a GitHub Gist (live cloud data), falls back to `master-snapshots/` repo files if the Gist is unavailable. **Auto-refreshes every 60 seconds** during live matches.
 
 ---
 

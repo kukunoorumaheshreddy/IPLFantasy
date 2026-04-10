@@ -586,33 +586,31 @@
     }
 
     // ---- Auto-load: try master-snapshots/ipl-fantasy-v2-master-gdN.json from high to low ----
-    const JSONBIN_BIN_ID = "69d137a6aaba882197c4a0cb";
-    const JSONBIN_READ_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`;
+    const GIST_RAW_URL = "https://gist.githubusercontent.com/kukunoorumaheshreddy/6c5971610305a9860560f135da03629b/raw/ipl-fantasy-data.json";
 
     (async function autoLoad() {
       const statusEl = document.getElementById('autoLoadStatus');
       const loadStart = Date.now();
       const MIN_SPLASH_MS = 2500; // Show cricket animation for at least 2.5 seconds
 
-      // Try JSONBin first (live cloud data)
+      // Try Gist first (live cloud data)
       try {
         statusEl.textContent = 'Checking for live data...';
-        const jbRes = await fetch(JSONBIN_READ_URL);
-        if (jbRes.ok) {
-          const jbJson = await jbRes.json();
-          const data = jbJson.record || jbJson;
+        const gistRes = await fetch(GIST_RAW_URL + `?t=${Date.now()}`);
+        if (gistRes.ok) {
+          const data = await gistRes.json();
           if (data && data.gamedays && data.gamedays.length > 0) {
-            currentFileName = `JSONBin (live) — ${data.gamedays.length} matches`;
+            currentFileName = `Live — ${data.gamedays.length} matches`;
             const elapsed = Date.now() - loadStart;
             if (elapsed < MIN_SPLASH_MS) await new Promise(r => setTimeout(r, MIN_SPLASH_MS - elapsed));
             statusEl.style.display = 'none';
             processData(data);
-            console.log(`[Dashboard] Loaded from JSONBin (${data.gamedays.length} matches, extracted ${data.extractedAt})`);
+            console.log(`[Dashboard] Loaded from Gist (${data.gamedays.length} matches, extracted ${data.extractedAt})`);
             return;
           }
         }
       } catch (e) {
-        console.log('[Dashboard] JSONBin unavailable, falling back to repo files:', e.message);
+        console.log('[Dashboard] Gist unavailable, falling back to repo files:', e.message);
       }
 
       // Fallback: try repo files gd70 down to gd1
@@ -642,7 +640,7 @@
       console.log('[Dashboard] No snapshot files found in master-snapshots/. Showing manual upload.');
     })();
 
-    // ---- Auto-refresh from JSONBin every 60 seconds ----
+    // ---- Auto-refresh from Gist every 60 seconds ----
     const DASHBOARD_REFRESH_MS = 60 * 1000;
     let autoRefreshTimer = null;
 
@@ -650,16 +648,15 @@
       if (autoRefreshTimer) clearInterval(autoRefreshTimer);
       autoRefreshTimer = setInterval(async () => {
         try {
-          const res = await fetch(JSONBIN_READ_URL);
+          const res = await fetch(GIST_RAW_URL + `?t=${Date.now()}`);
           if (!res.ok) return;
-          const jbJson = await res.json();
-          const data = jbJson.record || jbJson;
+          const data = await res.json();
           if (data && data.gamedays && data.gamedays.length > 0) {
             // Only refresh if data actually changed
             if (data.extractedAt !== rawData?.extractedAt) {
-              currentFileName = `JSONBin (live) — ${data.gamedays.length} matches`;
+              currentFileName = `Live — ${data.gamedays.length} matches`;
               processData(data);
-              console.log(`[Dashboard] Auto-refreshed from JSONBin (${data.extractedAt})`);
+              console.log(`[Dashboard] Auto-refreshed from Gist (${data.extractedAt})`);
             }
           }
         } catch (e) {

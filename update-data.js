@@ -10,12 +10,12 @@
 //   1. Go to fantasy.iplt20.com and LOG IN
 //   2. Open DevTools (F12) → Console
 //   3. Paste this entire script → Enter
-//   4. Script fetches data, uploads to JSONBin, and repeats every 5 min
-//   5. Dashboard auto-reads from JSONBin on refresh
+//   4. Script fetches data, uploads to GitHub Gist, and repeats every 5 min
+//   5. Dashboard auto-reads from Gist on refresh
 //   6. Close the tab to stop polling
 //
-// FIRST RUN: You'll be prompted for your JSONBin API key (stored in localStorage).
-// To reset: localStorage.removeItem('jsonbin_key')
+// FIRST RUN: You'll be prompted for your GitHub PAT (stored in localStorage).
+// To reset: localStorage.removeItem('github_pat')
 // ============================================================
 
 (async () => {
@@ -26,14 +26,15 @@
   const PHASE_ID = 1;
   const POLL_INTERVAL_MS = 7 * 60 * 1000; // 7 minutes
 
-  // ── JSONBin config ──
-  const JSONBIN_BIN_ID = "69d137a6aaba882197c4a0cb";
-  const JSONBIN_API = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
-  let JSONBIN_KEY = localStorage.getItem("jsonbin_key");
-  if (!JSONBIN_KEY) {
-    JSONBIN_KEY = prompt("Enter your JSONBin X-Master-Key (one-time setup):");
-    if (JSONBIN_KEY) localStorage.setItem("jsonbin_key", JSONBIN_KEY);
-    else { console.error("No JSONBin key provided. Aborting."); return; }
+  // ── GitHub Gist config ──
+  const GIST_ID = "6c5971610305a9860560f135da03629b";
+  const GIST_FILENAME = "ipl-fantasy-data.json";
+  const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
+  let GITHUB_PAT = localStorage.getItem("github_pat");
+  if (!GITHUB_PAT) {
+    GITHUB_PAT = prompt("Enter your GitHub PAT with gist scope (one-time setup):");
+    if (GITHUB_PAT) localStorage.setItem("github_pat", GITHUB_PAT);
+    else { console.error("No GitHub PAT provided. Aborting."); return; }
   }
 
   const log = (msg) => console.log(`%c[Update-v3] ${msg}`, "color: #6c5ce7; font-weight: bold;");
@@ -47,16 +48,19 @@
   }
 
 
-  async function uploadToJsonBin(data) {
-    const resp = await fetch(JSONBIN_API, {
-      method: "PUT",
+  async function uploadToGist(data) {
+    const payload = JSON.stringify(data);
+    const sizeKB = (payload.length / 1024).toFixed(1);
+    log(`Gist payload size: ${sizeKB} KB`);
+    const resp = await fetch(GIST_API, {
+      method: "PATCH",
       headers: {
+        "Authorization": `Bearer ${GITHUB_PAT}`,
         "Content-Type": "application/json",
-        "X-Master-Key": JSONBIN_KEY,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ files: { [GIST_FILENAME]: { content: payload } } }),
     });
-    if (!resp.ok) throw new Error(`JSONBin upload failed: ${resp.status} ${resp.statusText}`);
+    if (!resp.ok) throw new Error(`Gist upload failed: ${resp.status} ${resp.statusText}`);
     return resp.json();
   }
 
@@ -101,14 +105,13 @@
   // ── Main extraction function (called each poll cycle) ──
   async function runExtraction() {
 
-  // ── 0. Load existing data from JSONBin (for cached player data) ──
+  // ── 0. Load existing data from Gist (for cached player data) ──
   let cachedPlayerData = {}; // gd -> { playerId -> { name, gdPoints, isOverseas, teamId } }
   try {
-    log("Loading existing data from JSONBin for player cache...");
-    const existing = await fetch(`${JSONBIN_API}/latest`).then(r => r.json());
-    const prev = existing.record || existing;
-    if (prev && prev.playerDataCache) {
-      cachedPlayerData = prev.playerDataCache;
+    log("Loading existing data from Gist for player cache...");
+    const existing = await fetch(`https://gist.githubusercontent.com/kukunoorumaheshreddy/${GIST_ID}/raw/${GIST_FILENAME}?t=${Date.now()}`).then(r => r.json());
+    if (existing && existing.playerDataCache) {
+      cachedPlayerData = existing.playerDataCache;
       log(`  Loaded cached player data for ${Object.keys(cachedPlayerData).length} gamedays`);
     } else {
       log("  No cached player data found, will fetch all.");
@@ -786,16 +789,16 @@
     log(`    ${i + 1}. ${m.teamName}: ${m.totalBoosterPoints} booster pts (${m.boosterCount} boosters used)`);
   });
 
-  // ── 9. Upload to JSONBin ──
+  // ── 9. Upload to Gist ──
   const latestGdId = gamedayIds[gamedayIds.length - 1];
   const apiCalls = 2 + members.length + boosterGds.size;
 
   try {
-    log("Uploading to JSONBin...");
+    log("Uploading to Gist...");
     // Strip playerDataCache from upload (dashboard doesn't need it, saves ~360KB)
     const { playerDataCache, ...uploadPayload } = output;
-    await uploadToJsonBin(uploadPayload);
-    ok(`✅ Uploaded to JSONBin successfully!`);
+    await uploadToGist(uploadPayload);
+    ok(`✅ Uploaded to Gist successfully!`);
   } catch (e) {
     warn(`Upload failed: ${e.message}`);
   }

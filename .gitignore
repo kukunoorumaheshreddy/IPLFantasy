@@ -2,6 +2,11 @@
 start-dashboard.bat
 HANDOFF.md
 
+# Secrets / tokens
+github_pat*
+*.key
+*.secret
+
 # OS files
 Thumbs.db
 .DS_Store
