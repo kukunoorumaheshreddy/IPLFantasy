@@ -116,7 +116,7 @@ Each team gets **6 booster types (10 total uses)** across the tournament. When a
 | Booster | What It Does | Uses |
 |---------|-------------|------|
 | 🎯 **FREE_HIT** | Change your entire team for one match (reverts after) | 1 |
-| 🃏 **WILD_CARD** | Same as Free Hit — change team freely for one match | 1 |
+| 🃏 **WILD_CARD** | Change your entire team for one match (changes are permanent) | 1 |
 | ⚡ **DOUBLE_POWER** | Full team doubled (similar to Free Hit) | 2 |
 | 👑 **TRIPLE_CAPTAIN** | Your captain scores ×3 instead of the usual ×2 | 2 |
 | 🌍 **FOREIGN_STARS** | All overseas players in your team score double | 2 |

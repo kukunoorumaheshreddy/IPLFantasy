@@ -25,6 +25,7 @@
   const DELAY_MS = 300;
   const PHASE_ID = 1;
   const POLL_INTERVAL_MS = 7 * 60 * 1000; // 7 minutes
+  const REVIEW_MODE = false; // true = download JSON for review, defer upload; false = upload directly
 
   // ── GitHub Gist config ──
   const GIST_ID = "6c5971610305a9860560f135da03629b";
@@ -575,7 +576,8 @@
   members.forEach(m => { cumulative[m.teamName] = 0; });
 
   // Track "last real squad" per team for transfer efficiency
-  // FREE_HIT / WILD_CARD squads are temporary — skip them when tracking
+  // FREE_HIT squads revert after the match — skip lastRealSquad update
+  // WILD_CARD squads persist — update lastRealSquad, but skip transfer diff (changes are free)
   const lastRealSquad = {}; // teamName -> Set of player IDs
   members.forEach(m => { lastRealSquad[m.teamName] = null; });
 
@@ -630,6 +632,8 @@
         const currentSquad = new Set(td.squad || []);
         const prevSquad = lastRealSquad[m.teamName];
         const boosterType = td.boosterId ? (BOOSTER_TYPE[td.boosterId] || null) : null;
+        // FREE_HIT/WILD_CARD: no paid transfers — skip diff calculation
+        // But only FREE_HIT reverts the squad; WILD_CARD changes are permanent
         const isFreeSquadChange = boosterType === 'FREE_HIT' || boosterType === 'WILD_CARD';
 
         let transfersIn = [];
@@ -665,8 +669,10 @@
         const transferEfficiency = gdPts > 0 ? Math.round(transferInPts / gdPts * 1000) / 10 : 0;
         const transferAvg = transferCount > 0 ? Math.round(transferInPts / transferCount * 10) / 10 : 0;
 
-        // Update last real squad (skip FREE_HIT/WILD_CARD — squad reverts after)
-        if (!isFreeSquadChange && currentSquad.size > 0) {
+        // Update last real squad:
+        // FREE_HIT reverts → skip (keep previous lastRealSquad)
+        // WILD_CARD persists → update lastRealSquad even though transfers are free
+        if (boosterType !== 'FREE_HIT' && currentSquad.size > 0) {
           lastRealSquad[m.teamName] = currentSquad;
         }
 
@@ -789,22 +795,53 @@
     log(`    ${i + 1}. ${m.teamName}: ${m.totalBoosterPoints} booster pts (${m.boosterCount} boosters used)`);
   });
 
-  // ── 9. Upload to Gist ──
+  // ── 9. Upload to Gist (or download for review if REVIEW_MODE) ──
   const latestGdId = gamedayIds[gamedayIds.length - 1];
   const apiCalls = 2 + members.length + boosterGds.size;
 
-  try {
-    log("Uploading to Gist...");
-    // Strip playerDataCache from upload (dashboard doesn't need it, saves ~360KB)
-    const { playerDataCache, ...uploadPayload } = output;
-    await uploadToGist(uploadPayload);
-    ok(`✅ Uploaded to Gist successfully!`);
-  } catch (e) {
-    warn(`Upload failed: ${e.message}`);
-  }
+  // Strip playerDataCache from the payload (dashboard doesn't need it, saves ~360KB)
+  const { playerDataCache, ...uploadPayload } = output;
 
-  ok(`\n✅ Done! ${gamedayIds.length} matches, ${members.length} members, ${boosterMatches.length} booster usages`);
-  ok(`   ${apiCalls} API calls (${boosterGds.size} extra for booster player data)`);
+  if (REVIEW_MODE) {
+    // Download locally for review, defer upload
+    const filename = `ipl-fantasy-v2-master-gd${latestGdId}.json`;
+    log(`Downloading ${filename} for review...`);
+    const blob = new Blob([JSON.stringify(uploadPayload, null, 2)], { type: "application/json" });
+    const dlUrl = URL.createObjectURL(blob);
+    const dlA = document.createElement("a");
+    dlA.href = dlUrl; dlA.download = filename; dlA.click();
+    URL.revokeObjectURL(dlUrl);
+    ok(`📥 Downloaded ${filename} — review it, then type uploadNow() to push to Gist.`);
+
+    window._pendingUpload = uploadPayload;
+    window.uploadNow = async () => {
+      if (!window._pendingUpload) { warn("Nothing to upload."); return; }
+      try {
+        log("Uploading to Gist...");
+        await uploadToGist(window._pendingUpload);
+        ok(`✅ Uploaded to Gist successfully!`);
+        window._pendingUpload = null;
+      } catch (e) {
+        warn(`Upload failed: ${e.message}`);
+      }
+    };
+
+    ok(`\n✅ Done! ${gamedayIds.length} matches, ${members.length} members, ${boosterMatches.length} booster usages`);
+    ok(`   ${apiCalls} API calls (${boosterGds.size} extra for booster player data)`);
+    ok(`   ⚠️ Data NOT uploaded yet. Type uploadNow() after reviewing the downloaded file.`);
+  } else {
+    // Upload directly
+    try {
+      log("Uploading to Gist...");
+      await uploadToGist(uploadPayload);
+      ok(`✅ Uploaded to Gist successfully!`);
+    } catch (e) {
+      warn(`Upload failed: ${e.message}`);
+    }
+
+    ok(`\n✅ Done! ${gamedayIds.length} matches, ${members.length} members, ${boosterMatches.length} booster usages`);
+    ok(`   ${apiCalls} API calls (${boosterGds.size} extra for booster player data)`);
+  }
 
   return output;
   } // end runExtraction
@@ -835,8 +872,12 @@
     const data = window._lastOutput;
     if (!data) { warn("No data yet."); return; }
     const gdId = data.gamedays[data.gamedays.length - 1]?.gamedayId || "unknown";
-    downloadJSON(data, `ipl-fantasy-v2-master-gd${gdId}.json`);
-    ok(`Downloaded ipl-fantasy-v2-master-gd${gdId}.json`);
+    const fname = `ipl-fantasy-v2-master-gd${gdId}.json`;
+    const b = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const u = URL.createObjectURL(b);
+    const a = document.createElement("a"); a.href = u; a.download = fname; a.click();
+    URL.revokeObjectURL(u);
+    ok(`Downloaded ${fname}`);
   };
 
   // First run immediately, then poll
@@ -845,6 +886,6 @@
 
   const nextTime = new Date(Date.now() + POLL_INTERVAL_MS);
   ok(`⏳ Next update at ${nextTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Close tab to stop.`);
-  ok(`   Type stopPolling() to stop, downloadLastData() to save file.`);
+  ok(`   Type uploadNow() to push to Gist, stopPolling() to stop, downloadLastData() to save file.`);
   window._pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
 })();
