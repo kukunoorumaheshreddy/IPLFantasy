@@ -1245,15 +1245,36 @@
       const worst = matchRanking[matchRanking.length - 1];
 
       const boosterUsers = matchRanking.filter(e => e.boosterId);
+      // Use match playing XI if available, otherwise collect from fantasy teams
+      let allMatchPlayerNames;
+      if (gd.matchPlayingXI && gd.matchPlayingXI.length > 0) {
+        allMatchPlayerNames = gd.matchPlayingXI;
+      } else {
+        const nameSet = new Set();
+        matchRanking.forEach(e => {
+          if (e.captain && e.captain !== '—') nameSet.add(e.captain);
+          if (e.viceCaptain && e.viceCaptain !== '—') nameSet.add(e.viceCaptain);
+          e.activePlayers.forEach(p => nameSet.add(p.name));
+        });
+        allMatchPlayerNames = [...nameSet];
+      }
       let html = '';
+
+      // Helper: shorten full name to surname, adding first initial if another player shares the surname
+      function shortName(fullName) {
+        const parts = fullName.split(' ');
+        const surname = parts.slice(-1)[0];
+        const hasDupe = allMatchPlayerNames.some(n => n !== fullName && n.split(' ').slice(-1)[0] === surname);
+        return hasDupe ? fullName : surname;
+      }
 
       // Helper: format captain/VC name with status indicator and points
       function formatPlayerStatus(name, status, pts) {
-        const surname = name.split(' ').slice(-1)[0];
+        const short = shortName(name);
         const ptsStr = pts != null ? ` (${pts})` : '';
-        if (status === 'not_playing') return '<span title="Not in match — team not playing" style="color:#e74c3c;">⚠️ ' + surname + ptsStr + '</span>';
-        if (status === 'impact') return '<span title="Impact player (substitute)" style="color:#f39c12;">🔄 ' + surname + ptsStr + '</span>';
-        return surname + ptsStr;
+        if (status === 'not_playing') return '<span title="Not in match — team not playing" style="color:#e74c3c;">⚠️ ' + short + ptsStr + '</span>';
+        if (status === 'impact') return '<span title="Impact player (substitute)" style="color:#f39c12;">🔄 ' + short + ptsStr + '</span>';
+        return short + ptsStr;
       }
 
       // Show match status badge
@@ -1317,7 +1338,7 @@
         const overallRankDisplay = rankChangeHtml || '<span style="opacity:0.3;">—</span>';
 
         const playersDisplay = entry.activePlayers.length > 0
-          ? entry.activePlayers.map(p => `${p.name.split(' ').slice(-1)[0]} (${p.pts})`).join(', ')
+          ? entry.activePlayers.map(p => `${shortName(p.name)} (${p.pts})`).join(', ')
           : '<span style="opacity:0.3;">—</span>';
 
         html += `<tr>

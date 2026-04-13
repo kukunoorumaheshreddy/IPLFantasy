@@ -10,7 +10,7 @@
 //   1. Go to fantasy.iplt20.com and LOG IN
 //   2. Open DevTools (F12) → Console
 //   3. Paste this entire script → Enter
-//   4. Script fetches data, uploads to GitHub Gist, and repeats every 5 min
+//   4. Script fetches data, uploads to GitHub Gist, and repeats every 4 min
 //   5. Dashboard auto-reads from Gist on refresh
 //   6. Close the tab to stop polling
 //
@@ -24,7 +24,7 @@
   const HEADERS = { "entity": "d3tR0!t5m@sh" };
   const DELAY_MS = 300;
   const PHASE_ID = 1;
-  const POLL_INTERVAL_MS = 7 * 60 * 1000; // 7 minutes
+  const POLL_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
   const REVIEW_MODE = false; // true = download JSON for review, defer upload; false = upload directly
 
   // ── GitHub Gist config ──
@@ -617,6 +617,9 @@
 
   for (const gd of gamedayIds) {
     const mi = matchInfo[gd] || { matchName: `Match ${gd}`, matchDate: null, isLive: false, isAbandoned: false };
+    const matchTeamIds = new Set();
+    if (mi.homeTeamId) matchTeamIds.add(mi.homeTeamId);
+    if (mi.awayTeamId) matchTeamIds.add(mi.awayTeamId);
 
     members.forEach(m => {
       cumulative[m.teamName] += teamData[m.teamName]?.gdPtsMap?.[gd] || 0;
@@ -678,15 +681,12 @@
 
         // Determine captain/VC playing status from player data (not overall-get which is context-dependent)
         const gdPlayerData = playerDataByGd[gd] || {};
-        const matchTeamIds = new Set();
-        if (mi.homeTeamId) matchTeamIds.add(mi.homeTeamId);
-        if (mi.awayTeamId) matchTeamIds.add(mi.awayTeamId);
 
         function getPlayerStatus(playerId) {
           const p = gdPlayerData[playerId];
           if (!p || matchTeamIds.size === 0) return "playing";
           if (!matchTeamIds.has(p.teamId)) return "not_playing";
-          if (p.isAnnounced === 2 || p.isAnnounced === "S") return "impact";
+          if (p.isAnnounced === "S" || p.isAnnounced === 2) return "impact";
           return "playing";
         }
 
@@ -753,6 +753,11 @@
       e.rank = (i > 0 && e.totalPoints === ranked[i - 1].totalPoints) ? ranked[i - 1].rank : i + 1;
     });
 
+    // Collect announced match playing XI names ("P" = playing, "S" = sub/impact)
+    const matchPlayingXI = Object.values(playerDataByGd[gd] || {})
+      .filter(p => (p.isAnnounced === "P" || p.isAnnounced === "S") && matchTeamIds.has(p.teamId))
+      .map(p => p.name);
+
     output.gamedays.push({
       gamedayId: gd,
       matchName: mi.matchName,
@@ -761,6 +766,7 @@
       isAbandoned: mi.isAbandoned || false,
       isEstimated: fallbackGds.includes(gd),
       scoresAsOf: fallbackTimestamps[gd] || null,
+      matchPlayingXI,
       leaderboard: ranked,
     });
 
