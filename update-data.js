@@ -136,6 +136,7 @@
     return;
   }
 
+
   // Build match info lookup
   const matchInfo = {};
   completedOrLive.forEach(m => {
@@ -860,6 +861,14 @@
     log(`🔄 Run #${runCount} — ${new Date().toLocaleTimeString()}`);
     log(`${"═".repeat(50)}`);
     try {
+      const fixturesCheck = await apiFetch("feed/tour-fixtures");
+      const allMatchesCheck = fixturesCheck?.Data?.Value || [];
+      const liveCheck = allMatchesCheck.filter(m => m.MatchStatus === 1);
+      if (liveCheck.length === 0) {
+        warn("No live matches. Stopping polling.");
+        window.stopPolling();
+        return;
+      }
       window._lastOutput = await runExtraction();
     } catch (e) {
       warn(`❌ Run #${runCount} failed: ${e.message}`);
