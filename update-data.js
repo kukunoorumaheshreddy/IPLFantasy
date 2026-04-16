@@ -72,23 +72,18 @@
   // │ "Master of Boosters" prize = total booster-attributed points.       │
   // │ These are calculated SEPARATELY from league standings points.       │
   // │                                                                     │
-  // │ Current interpretation (B):                                         │
-  // │   FREE_HIT:        Total match gamedayPoints (squad flexibility)    │
-  // │   WILD_CARD:       Total match gamedayPoints (squad flexibility)    │
-  // │   DOUBLE_POWER:    All players' points × 2 (full doubled amount)   │
+  // │ All booster points are calculated from raw player data               │
+  // │ (gamedayplayers API), NOT from overall-get gdpts, because the API   │
+  // │ gdpts for completed matches already includes booster effects.       │
+  // │                                                                     │
+  // │   FREE_HIT:        Sum of all squad players' effective pts          │
+  // │   WILD_CARD:       Sum of all squad players' effective pts          │
+  // │   DOUBLE_POWER:    Sum of all squad players' effective pts × 2     │
   // │   TRIPLE_CAPTAIN:  Captain base pts × 3 (full tripled amount)      │
   // │   FOREIGN_STARS:   Foreign players' effective pts × 2 only         │
-  // │                    (Indian players NOT counted)                      │
   // │   INDIAN_WARRIORS: Indian players' effective pts × 2 only          │
-  // │                    (Foreign players NOT counted)                     │
   // │                                                                     │
-  // │ Alternative interpretation (A — extra only):                        │
-  // │   To switch, change calculations to subtract normal points:         │
-  // │   DOUBLE_POWER:    gdPts (the extra copy, not 2x)                  │
-  // │   TRIPLE_CAPTAIN:  captain base × 1 (extra 1x beyond normal 2x)   │
-  // │   FOREIGN_STARS:   sum of foreign effective pts × 1 (the extra)    │
-  // │   INDIAN_WARRIORS: sum of indian effective pts × 1 (the extra)     │
-  // │   FREE_HIT/WILD_CARD: same in both interpretations                 │
+  // │ "Effective pts" = player base gdPoints × captain/VC multiplier      │
   // └─────────────────────────────────────────────────────────────────────┘
   //
   // Booster IDs are mapped as discovered. Unknown IDs fall back to total match points.
@@ -379,6 +374,24 @@
   log("\n── Calculating booster points ──");
   const boosterPointsMap = {}; // teamName -> [ { gd, boosterId, boosterType, boosterPoints, details } ]
 
+  // Helper: compute squad total from raw player data with captain/VC multipliers
+  function calcSquadEffective(squad, captainId, viceCaptainId, playerMap, filterFn) {
+    let total = 0;
+    const breakdown = [];
+    squad.forEach(pid => {
+      const p = playerMap[pid];
+      if (!p) return;
+      if (filterFn && !filterFn(p)) return;
+      let baseMult = 1;
+      if (pid === captainId) baseMult = 2;
+      else if (pid === viceCaptainId) baseMult = 1.5;
+      const effective = p.gdPoints * baseMult;
+      total += effective;
+      breakdown.push({ name: p.name, gdPoints: p.gdPoints, baseMult, effective, isOverseas: p.isOverseas });
+    });
+    return { total, breakdown };
+  }
+
   for (const bm of boosterMatches) {
     const td = teamData[bm.teamName];
     const pm = td.perMatch[bm.gd];
@@ -388,19 +401,35 @@
     let boosterPoints = 0;
     let details = '';
 
-    // Interpretation B: All points scored by qualifying players (at their boosted rate)
+    // All booster points calculated from raw player data (gamedayplayers API)
+    // because overall-get gdpts already includes booster effects for completed matches
     if (bm.boosterType === 'FREE_HIT' || bm.boosterType === 'WILD_CARD') {
-      // Entire match points count (whole team qualifies)
-      boosterPoints = gdPts;
-      details = `Total match pts: ${gdPts}`;
+      // Squad flexibility booster — no point multiplier, just total effective pts
+      const { total, breakdown } = calcSquadEffective(pm.squad, pm.captainId, pm.viceCaptainId, players);
+      if (total > 0) {
+        boosterPoints = total;
+        details = `Total effective pts: ${breakdown.map(p => `${p.name}: ${p.gdPoints}×${p.baseMult}=${p.effective}`).join(', ')} = ${total}`;
+      } else {
+        // Fallback to gdPts if player data unavailable
+        boosterPoints = gdPts;
+        details = `Total match pts (from API): ${gdPts}`;
+      }
 
     } else if (bm.boosterType === 'DOUBLE_POWER') {
-      // Entire team doubled — all players' doubled points
-      boosterPoints = gdPts * 2;
-      details = `Double power (all players 2x): ${gdPts} × 2 = ${gdPts * 2}`;
+      // All players' effective pts × 2
+      const { total, breakdown } = calcSquadEffective(pm.squad, pm.captainId, pm.viceCaptainId, players);
+      if (total > 0) {
+        boosterPoints = total * 2;
+        details = `Double power (all players 2x): ${breakdown.map(p => `${p.name}: ${p.gdPoints}×${p.baseMult}=${p.effective}`).join(', ')} = ${total} × 2 = ${total * 2}`;
+      } else {
+        // Fallback: gdPts from API is already boosted for completed matches, so use as-is
+        boosterPoints = gdPts;
+        details = `Double power (from API, already boosted): ${gdPts}`;
+        warn(`  ⚠️ No player data for GD${bm.gd}, using API gdpts as-is (already includes booster)`);
+      }
 
     } else if (bm.boosterType === 'TRIPLE_CAPTAIN') {
-      // Captain gets 3x — booster pts = captain's full boosted amount (base × 3)
+      // Captain gets 3x — booster pts = captain's base pts × 3
       const captainPlayer = players[pm.captainId];
       if (captainPlayer) {
         boosterPoints = captainPlayer.gdPoints * 3;
@@ -411,40 +440,16 @@
       }
 
     } else if (bm.boosterType === 'FOREIGN_STARS') {
-      // Foreign players get 2x — booster pts = all foreign players' doubled points
-      let foreignPts = 0;
-      const foreignDetails = [];
-      pm.squad.forEach(pid => {
-        const p = players[pid];
-        if (p && p.isOverseas) {
-          let baseMult = 1;
-          if (pid === pm.captainId) baseMult = 2;
-          else if (pid === pm.viceCaptainId) baseMult = 1.5;
-          const boosted = p.gdPoints * baseMult * 2;
-          foreignPts += boosted;
-          foreignDetails.push(`${p.name}: ${p.gdPoints}×${baseMult}×2=${boosted}`);
-        }
-      });
-      boosterPoints = foreignPts;
-      details = `Foreign players (doubled): ${foreignDetails.join(', ')} = ${foreignPts}`;
+      // Foreign players get 2x — booster pts = all foreign players' effective pts × 2
+      const { total, breakdown } = calcSquadEffective(pm.squad, pm.captainId, pm.viceCaptainId, players, p => p.isOverseas);
+      boosterPoints = total * 2;
+      details = `Foreign players (doubled): ${breakdown.map(p => `${p.name}: ${p.gdPoints}×${p.baseMult}×2=${p.effective * 2}`).join(', ')} = ${boosterPoints}`;
 
     } else if (bm.boosterType === 'INDIAN_WARRIORS') {
-      // Indian players get 2x — booster pts = all Indian players' doubled points
-      let indianPts = 0;
-      const indianDetails = [];
-      pm.squad.forEach(pid => {
-        const p = players[pid];
-        if (p && !p.isOverseas) {
-          let baseMult = 1;
-          if (pid === pm.captainId) baseMult = 2;
-          else if (pid === pm.viceCaptainId) baseMult = 1.5;
-          const boosted = p.gdPoints * baseMult * 2;
-          indianPts += boosted;
-          indianDetails.push(`${p.name}: ${p.gdPoints}×${baseMult}×2=${boosted}`);
-        }
-      });
-      boosterPoints = indianPts;
-      details = `Indian players (doubled): ${indianDetails.join(', ')} = ${indianPts}`;
+      // Indian players get 2x — booster pts = all Indian players' effective pts × 2
+      const { total, breakdown } = calcSquadEffective(pm.squad, pm.captainId, pm.viceCaptainId, players, p => !p.isOverseas);
+      boosterPoints = total * 2;
+      details = `Indian players (doubled): ${breakdown.map(p => `${p.name}: ${p.gdPoints}×${p.baseMult}×2=${p.effective * 2}`).join(', ')} = ${boosterPoints}`;
 
     } else {
       // Unknown booster — fall back to total match points
