@@ -870,7 +870,9 @@
       const allMatchesCheck = fixturesCheck?.Data?.Value || [];
       const liveCheck = allMatchesCheck.filter(m => m.MatchStatus === 1);
       if (liveCheck.length === 0) {
-        warn("No live matches. Stopping polling.");
+        warn("No live matches. Running final extraction before stopping...");
+        window._lastOutput = await runExtraction();
+        warn("Final extraction done. Stopping polling.");
         window.stopPolling();
         return;
       }
