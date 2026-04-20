@@ -26,6 +26,7 @@
   const PHASE_ID = 1;
   const POLL_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
   const REVIEW_MODE = false; // true = download JSON for review, defer upload; false = upload directly
+  const SKIP_TRANSFER_FETCH = true; // true = skip Phase 5b player-data fetches (saves ~20s); transfer efficiency will show 0 for non-booster GDs
 
   // ── GitHub Gist config ──
   const GIST_ID = "6c5971610305a9860560f135da03629b";
@@ -103,6 +104,9 @@
 
   // ── 0. Load existing data from Gist (for cached player data) ──
   let cachedPlayerData = {}; // gd -> { playerId -> { name, gdPoints, isOverseas, teamId } }
+  if (SKIP_TRANSFER_FETCH) {
+    log("Skipping Gist cache load (SKIP_TRANSFER_FETCH=true, cache not needed).");
+  } else {
   try {
     log("Loading existing data from Gist for player cache...");
     const existing = await fetch(`https://gist.githubusercontent.com/kukunoorumaheshreddy/${GIST_ID}/raw/${GIST_FILENAME}?t=${Date.now()}`).then(r => r.json());
@@ -114,6 +118,7 @@
     }
   } catch (e) {
     log("  Could not load existing data, will fetch all: " + e.message);
+  }
   }
 
   // ── 1. Get fixtures ──
@@ -519,6 +524,10 @@
   // ── 5b. Fetch player data for transfer efficiency ──
   // Merge step 3b's live player data and step 4's booster player data into playerDataByGd
   // Then fetch remaining gamedays from cache or API
+  if (SKIP_TRANSFER_FETCH) {
+    log("\n── Skipping Phase 5b player-data fetches (SKIP_TRANSFER_FETCH=true) ──");
+    log(`  playerDataByGd has ${Object.keys(playerDataByGd).length} GDs from phases 3b/4 (booster+live)`);
+  } else {
   log("\n── Fetching player data for transfer efficiency ──");
 
   // Step 3b saves to local playerMap — we need to also save those
@@ -574,6 +583,7 @@
   }
 
   log(`  Player data available for ${Object.keys(playerDataByGd).length}/${gamedayIds.length} gamedays`);
+  } // end SKIP_TRANSFER_FETCH
 
   // ── 6. Build cumulative rankings per gameday ──
   log("\n── Building cumulative rankings ──");

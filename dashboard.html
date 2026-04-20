@@ -401,7 +401,8 @@
         <button class="view-tab" data-view="rank" onclick="switchView('rank')">Rank Progression</button>
         <button class="view-tab" data-view="race" onclick="switchView('race')">Points Race</button>
         <button class="view-tab" data-view="heatmap" onclick="switchView('heatmap')">Rank Heatmap</button>
-        <button class="view-tab" data-view="transferHeatmap" onclick="switchView('transferHeatmap')">Transfer Efficiency</button>
+        <!-- Transfer Efficiency tab hidden (Phase 5b disabled in update-data.js) -->
+        <!-- <button class="view-tab" data-view="transferHeatmap" onclick="switchView('transferHeatmap')">Transfer Efficiency</button> -->
       </div>
 
       <!-- Rank Chart -->
@@ -803,8 +804,8 @@
       initRace(gamedays, members, matchDetails);
       renderPtsAnimChart(labels, members, matchDetails);
 
-      // Transfer efficiency heatmap — includes live data
-      renderTransferHeatmap(standingsGamedays, standingsMembers);
+      // Transfer efficiency heatmap — disabled (Phase 5b skipped in update-data.js)
+      // renderTransferHeatmap(standingsGamedays, standingsMembers);
 
       // Update tab labels with * when live data present
       const liveStar = liveGamedays.length > 0 ? '*' : '';
