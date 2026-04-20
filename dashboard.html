@@ -242,7 +242,7 @@
       border-radius: 8px;
       padding: 4px;
       margin-bottom: 12px;
-      width: fit-content;
+      align-items: center;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
@@ -325,7 +325,7 @@
 </head>
 <body>
   <header>
-    <h1>🏏 Big Blue Championship — IPL Fantasy 2026</h1>
+    <h1 style="margin:0;">🏏 Big Blue Championship — IPL Fantasy 2026</h1>
     <p>Track how each team's ranking progresses through the tournament</p>
   </header>
 
@@ -419,13 +419,15 @@
       <!-- Points Chart -->
       <!-- Table View -->
       <div class="table-section" id="tableView" style="display:none;">
-        <h3 id="standingsHeading" style="margin-bottom:4px;">Current Standings</h3>
+        <h3 id="standingsHeading" style="margin-bottom:4px;display:inline;">Current Standings</h3>
+        <span class="refresh-status" style="font-size:13px;font-weight:600;color:#fdcb6e;margin-left:12px;opacity:0;transition:opacity 0.3s;"></span>
         <div id="standingsTable" style="overflow-x:auto;"></div>
       </div>
 
       <!-- Prizes -->
       <div class="table-section" id="prizesView" style="display:none;">
-        <h3 id="prizesHeading">Prize Contenders</h3>
+        <h3 id="prizesHeading" style="display:inline;">Prize Contenders</h3>
+        <span class="refresh-status" style="font-size:13px;font-weight:600;color:#fdcb6e;margin-left:12px;opacity:0;transition:opacity 0.3s;"></span>
         <div id="prizesContent"></div>
       </div>
 
@@ -436,7 +438,8 @@
             <h3 style="margin:0;">Per-Match Leaderboard</h3>
             <select id="matchSelect" onchange="showSelectedMatch()" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;min-width:220px;">
             </select>
-            <span style="font-size:13px;font-weight:600;opacity:0.95;white-space:nowrap;margin-left:auto;margin-right:80px;">Rank: <span class="rank-up">▲ moved up</span> <span class="rank-down">▼ moved down</span> vs prev match &nbsp;|&nbsp; C/VC: <span style="color:#e74c3c;">⚠️ Not in match</span> &nbsp;|&nbsp; <span style="color:#f39c12;">🔄 Impact player</span></span>
+            <span class="refresh-status" style="font-size:13px;font-weight:600;color:#fdcb6e;opacity:0;transition:opacity 0.3s;white-space:nowrap;"></span>
+            <span style="font-size:13px;font-weight:600;opacity:0.95;white-space:nowrap;margin-left:auto;">Rank: <span class="rank-up">▲ moved up</span> <span class="rank-down">▼ moved down</span> vs prev match &nbsp;|&nbsp; C/VC: <span style="color:#e74c3c;">⚠️ Not in match</span> &nbsp;|&nbsp; <span style="color:#f39c12;">🔄 Impact player</span></span>
           </div>
           <div id="playerDataNote" style="text-align:right;margin-right:80px;display:none;">
             <span style="font-size:12px;color:var(--muted);opacity:0.8;">ℹ️ Player list and scores are shown for last 2 completed + live matches only</span>
@@ -636,7 +639,7 @@
             if (elapsed < MIN_SPLASH_MS) await new Promise(r => setTimeout(r, MIN_SPLASH_MS - elapsed));
             statusEl.style.display = 'none';
             processData(data);
-            console.log(`[Dashboard] Loaded from Gist (${data.gamedays.length} matches, extracted ${data.extractedAt})`);
+            startAutoRefresh();
             return;
           }
         }
@@ -672,28 +675,67 @@
     })();
 
     // ---- Auto-refresh from Gist every 60 seconds ----
-    const DASHBOARD_REFRESH_MS = 60 * 1000;
+    const DASHBOARD_REFRESH_MS = 30 * 1000;
+    const REFRESH_SECONDS = DASHBOARD_REFRESH_MS / 1000;
     let autoRefreshTimer = null;
+    let countdownTimer = null;
+    let countdownSec = REFRESH_SECONDS;
+    let isRefreshing = false;
 
-    function startAutoRefresh() {
-      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-      autoRefreshTimer = setInterval(async () => {
-        try {
-          const res = await fetch(GIST_RAW_URL + `?t=${Date.now()}`);
-          if (!res.ok) return;
+    function updateCountdown() {
+      const els = document.querySelectorAll('.refresh-status');
+      if (isRefreshing) return;
+      els.forEach(el => { el.textContent = `Auto-refresh in ${countdownSec}s`; el.style.opacity = '0.6'; });
+    }
+
+    function startCountdown() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownSec = REFRESH_SECONDS;
+      updateCountdown();
+      countdownTimer = setInterval(() => {
+        countdownSec--;
+        if (countdownSec <= 0) {
+          clearInterval(countdownTimer);
+          refreshFromGist();
+        } else {
+          updateCountdown();
+        }
+      }, 1000);
+    }
+
+    async function refreshFromGist() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      const startMs = Date.now();
+      const els = document.querySelectorAll('.refresh-status');
+      function showHtml(html, opacity) {
+        els.forEach(el => { el.innerHTML = html; el.style.opacity = String(opacity); });
+      }
+      showHtml('<span style="display:inline-block;animation:spin 0.8s linear infinite;">⚙️</span> Refreshing...', 1);
+      try {
+        const res = await fetch(GIST_RAW_URL + `?t=${Date.now()}`);
+        if (res.ok) {
           const data = await res.json();
           if (data && data.gamedays && data.gamedays.length > 0) {
-            // Only refresh if data actually changed
             if (data.extractedAt !== rawData?.extractedAt) {
               currentFileName = `Live — ${data.gamedays.length} matches`;
               processData(data);
-              console.log(`[Dashboard] Auto-refreshed from Gist (${data.extractedAt})`);
             }
           }
-        } catch (e) {
-          console.log('[Dashboard] Auto-refresh failed:', e.message);
         }
-      }, DASHBOARD_REFRESH_MS);
+      } catch (e) { /* silent */ }
+      finally {
+        const elapsed = Date.now() - startMs;
+        const remaining = Math.max(1500 - elapsed, 0);
+        await new Promise(r => setTimeout(r, remaining));
+        isRefreshing = false;
+        startCountdown();
+      }
+    }
+
+    function startAutoRefresh() {
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      startCountdown();
     }
 
     // ---- Switch file handler ----
@@ -843,8 +885,7 @@
       document.getElementById('tabPrizes').textContent = 'Prizes' + liveStar;
       document.getElementById('tabMatchLb').textContent = 'Per-Match Leaderboard' + liveStar;
 
-      // Start auto-refresh from JSONBin (if loaded from cloud)
-      if (currentFileName.includes('JSONBin')) startAutoRefresh();
+      // Auto-refresh is started in the autoLoad flow when data comes from Gist
     }
 
     function renderStats(gamedays, members, liveCount, completedCount) {
@@ -1415,6 +1456,7 @@
       if (view === 'race') { stopRace(); ptsAnimDraw(ptsAnim.progress); }
       if (view !== 'race') stopRace();
       applyTeamHighlight();
+      refreshFromGist();
     }
 
     // ---- Standings Table ----
@@ -1498,7 +1540,17 @@
       } else {
         headingText = `Current Standings (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})` + (lastMatchName ? `, ${lastMatchName}` : '');
       }
-      document.getElementById('standingsHeading').textContent = headingText;
+      const standingsEl = document.getElementById('standingsHeading');
+      standingsEl.textContent = headingText;
+      if (liveInStandings.length > 0 && rawData?.extractedAt) {
+        const asOf = new Date(rawData.extractedAt);
+        const timeStr = asOf.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+        const dateStr = asOf.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        standingsEl.insertAdjacentHTML('afterend', '');
+        const badge = document.querySelector('#tableView .live-scores-badge');
+        if (badge) badge.remove();
+        standingsEl.insertAdjacentHTML('afterend', `<span class="live-scores-badge" style="display:inline-block;background:#fdcb6e;color:#000;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;margin-left:12px;vertical-align:middle;">⚡ LIVE — scores as of ${timeStr}, ${dateStr}</span>`);
+      }
     }
 
     // ---- Prizes ----
@@ -1663,7 +1715,16 @@
       } else {
         prizesHeadingText = `Prize Contenders (After ${gamedays.length} Match${gamedays.length !== 1 ? 'es' : ''})` + (lastPrizeMatchName ? `, ${lastPrizeMatchName}` : '');
       }
-      document.getElementById('prizesHeading').textContent = prizesHeadingText;
+      const prizesEl = document.getElementById('prizesHeading');
+      prizesEl.textContent = prizesHeadingText;
+      if (liveCount > 0 && rawData?.extractedAt) {
+        const asOf = new Date(rawData.extractedAt);
+        const timeStr = asOf.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+        const dateStr = asOf.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        const badge = document.querySelector('#prizesView .live-scores-badge');
+        if (badge) badge.remove();
+        prizesEl.insertAdjacentHTML('afterend', `<span class="live-scores-badge" style="display:inline-block;background:#fdcb6e;color:#000;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;margin-left:12px;vertical-align:middle;">⚡ LIVE — scores as of ${timeStr}, ${dateStr}</span>`);
+      }
     }
 
     // ---- Rank Heatmap ----
