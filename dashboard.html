@@ -893,17 +893,22 @@
       const leaderName = members[0]?.[0] || '—';
       const leaderPts = members[0]?.[1].points.filter(p=>p!=null).pop() || '—';
 
-      // Best single-match score across all teams
-      let bestMatch = { name: '—', pts: 0, matchIdx: 0 };
-      members.forEach(([name, data]) => {
-        data.gdPoints.forEach((pts, i) => {
-          if (pts != null && pts > bestMatch.pts) {
-            bestMatch = { name, pts, matchIdx: i };
+      // Best single-match score — split by booster used vs not
+      let bestWithBooster = { name: '—', pts: 0, gd: null };
+      let bestNoBooster   = { name: '—', pts: 0, gd: null };
+      gamedays.forEach(gd => {
+        (gd.leaderboard || []).forEach(e => {
+          const hasBooster = e.boosterId !== null && e.boosterId !== undefined;
+          const pts = e.gamedayPoints || 0;
+          if (hasBooster && pts > bestWithBooster.pts) {
+            bestWithBooster = { name: e.teamName, pts, gd };
+          } else if (!hasBooster && pts > bestNoBooster.pts) {
+            bestNoBooster = { name: e.teamName, pts, gd };
           }
         });
       });
-      const bestGd = gamedays[bestMatch.matchIdx];
-      const bestMatchLabel = bestGd ? `${bestGd.matchName} (M${bestGd.gamedayId})` : '';
+      const fmtMatch = ({ name, pts, gd }) =>
+        `${pts}<span style="font-size:12px;color:var(--text-dim);"> — ${name}${gd ? `, ${gd.matchName}` : ''}</span>`;
 
       const matchesLabel = liveCount > 0
         ? `${gamedays.length}<span style="font-size:12px;color:var(--text-dim);display:block;">${completedCount} completed + ${liveCount} live</span>`
@@ -913,7 +918,8 @@
         <div class="stat-card"><div class="label">Members</div><div class="value">${members.length}</div></div>
         <div class="stat-card"><div class="label">Matches</div><div class="value">${matchesLabel}</div></div>
         <div class="stat-card"><div class="label">League Leader</div><div class="value" style="font-size:18px;">${leaderName}<span style="font-size:12px;color:var(--text-dim);display:block;">${leaderPts} pts</span></div></div>
-        <div class="stat-card"><div class="label">Best Single Match</div><div class="value">${bestMatch.pts}<span style="font-size:12px;color:var(--text-dim);"> — ${bestMatch.name}, ${bestMatchLabel}</span></div></div>
+        <div class="stat-card"><div class="label">Best Match (w/ Booster)</div><div class="value">${fmtMatch(bestWithBooster)}</div></div>
+        <div class="stat-card"><div class="label">Best Match (no Booster)</div><div class="value">${fmtMatch(bestNoBooster)}</div></div>
       `;
       document.getElementById('statsRow').innerHTML = html;
 
