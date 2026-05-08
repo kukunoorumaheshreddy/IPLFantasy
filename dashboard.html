@@ -864,8 +864,35 @@
       // Charts — all use completed gamedays only
       renderRankChart(labels, members, matchDetails);
 
+      // Build league-phase snapshots for standings table
+      const hasPlayoffData = standingsGamedays.some(gd => gd.gamedayId >= 71);
+      let midSeasonSnapshot = null;
+      let leagueSnapshot = null;
+      if (hasPlayoffData) {
+        const midGds = standingsGamedays.filter(gd => gd.gamedayId <= 35);
+        if (midGds.length > 0) {
+          const midMap = buildMemberMap(midGds);
+          midSeasonSnapshot = {};
+          Object.entries(midMap).forEach(([name, d]) => {
+            const rank = d.ranks.filter(r => r != null).pop() || null;
+            const pts = d.points.filter(p => p != null).pop() || null;
+            midSeasonSnapshot[name] = { rank, pts };
+          });
+        }
+        const leaguePhaseGds = standingsGamedays.filter(gd => gd.gamedayId <= 70);
+        if (leaguePhaseGds.length > 0) {
+          const leagueMap = buildMemberMap(leaguePhaseGds);
+          leagueSnapshot = {};
+          Object.entries(leagueMap).forEach(([name, d]) => {
+            const rank = d.ranks.filter(r => r != null).pop() || null;
+            const pts = d.points.filter(p => p != null).pop() || null;
+            leagueSnapshot[name] = { rank, pts };
+          });
+        }
+      }
+
       // Tables — standings & prizes include live matches
-      renderTable(standingsGamedays, standingsMembers);
+      renderTable(standingsGamedays, standingsMembers, midSeasonSnapshot, leagueSnapshot);
       renderPrizes(standingsGamedays, standingsMembers, data, allGdIds);
 
       // Per-match leaderboard gets ALL gamedays (including live)
@@ -1460,7 +1487,7 @@
     }
 
     // ---- Standings Table ----
-    function renderTable(gamedays, members) {
+    function renderTable(gamedays, members, midSeasonSnapshot, leagueSnapshot) {
       const hasLive = gamedays.some(gd => gd.isEstimated || gd.isLive);
       const star = hasLive ? '<span style="color:#fdcb6e;" title="Includes live match — not final">*</span>' : '';
       let html = hasLive ? '<p class="subtitle" style="margin-bottom:16px;"><span style="color:#fdcb6e;font-size:12px;">* includes live match estimates</span></p>' : '';
@@ -1475,25 +1502,23 @@
         : 'Rank change compared to previous match';
 
       html += '<table><thead><tr>';
-      html += `<th style="text-align:center;">#</th><th>Team</th><th>Points</th><th style="text-align:center;" title="${sinceTooltip}">${sinceLabel}</th><th style="text-align:center;">Since M1</th>`;
+      html += `<th style="text-align:center;">#</th><th>Team</th><th>Points</th><th style="text-align:center;" title="${sinceTooltip}">${sinceLabel}</th>`;
+      if (midSeasonSnapshot) {
+        html += '<th style="text-align:center;" title="Rank after mid-season (Match 35)">M35 Rank</th><th style="text-align:center;" title="Points after mid-season (Match 35)">M35 Pts</th>';
+      }
+      if (leagueSnapshot) {
+        html += '<th style="text-align:center;" title="Rank after league phase (Match 70)">League Rank</th><th style="text-align:center;" title="Points after league phase (Match 70)">League Pts</th>';
+      }
       html += '<th style="text-align:center;">Transfers Left</th><th style="text-align:center;">Boosters Used</th><th style="text-align:center;">Best Rank</th><th style="text-align:center;">Worst Rank</th>';
       html += '</tr></thead><tbody>';
 
       members.forEach(([name, data], i) => {
         const currentRank = data.ranks.filter((r) => r != null).pop() || '—';
-        const firstRank = data.ranks.find((r) => r != null);
         const currentPts = data.points.filter((p) => p != null).pop() || '—';
         const lastGdPts = data.gdPoints.filter((p) => p != null).pop() || '—';
         const validRanks = data.ranks.filter((r) => r != null);
         const bestRank = validRanks.length ? Math.min(...validRanks) : '—';
         const worstRank = validRanks.length ? Math.max(...validRanks) : '—';
-
-        let changeHtml = '<span class="rank-same">—</span>';
-        if (firstRank != null && currentRank !== '—' && validRanks.length > 1) {
-          const diff = firstRank - currentRank;
-          if (diff > 0) changeHtml = `<span class="rank-up">▲${diff}</span>`;
-          else if (diff < 0) changeHtml = `<span class="rank-down">▼${Math.abs(diff)}</span>`;
-        }
 
         // Rank change since last match
         let lastMatchHtml = '<span class="rank-same">—</span>';
@@ -1514,12 +1539,25 @@
           : data.subsLeft != null ? `${data.subsLeft}` : '—';
 
         const color = getTeamColor(name);
+        const midSnapshotHtml = midSeasonSnapshot ? (() => {
+          const ms = midSeasonSnapshot[name];
+          const mr = ms?.rank ?? '—';
+          const mp = ms?.pts ?? '—';
+          return `<td style="text-align:center;font-weight:700;">${mr}</td><td style="text-align:center;">${mp}</td>`;
+        })() : '';
+        const leagueSnapshotHtml = leagueSnapshot ? (() => {
+          const ls = leagueSnapshot[name];
+          const lr = ls?.rank ?? '—';
+          const lp = ls?.pts ?? '—';
+          return `<td style="text-align:center;font-weight:700;">${lr}</td><td style="text-align:center;">${lp}</td>`;
+        })() : '';
         html += `<tr data-team="${name}" onclick="selectTeam('${name}')">
           <td style="text-align:center;"><span style="color:${color};font-weight:700;">${currentRank}</span></td>
           <td><span class="dot" style="background:${color};margin-right:8px;"></span>${name}</td>
           <td>${currentPts}${star}</td>
           <td style="text-align:center;">${lastMatchHtml}</td>
-          <td style="text-align:center;">${changeHtml}</td>
+          ${midSnapshotHtml}
+          ${leagueSnapshotHtml}
           <td style="text-align:center;">${subsHtml}</td>
           <td style="text-align:center;">${boosterHtml}</td>
           <td style="text-align:center;">${bestRank}</td>
@@ -1584,7 +1622,7 @@
         .sort((a, b) => b.totalBoosterPts - a.totalBoosterPts);
 
       // Playoff ranking
-      const playoffGds = gamedays.filter(gd => gd.gamedayId >= 57);
+      const playoffGds = gamedays.filter(gd => gd.gamedayId >= 71);
       let playoffRanking = null;
       if (playoffGds.length > 0) {
         const playoffPts = {};

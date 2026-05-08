@@ -6,7 +6,7 @@ A live visualization dashboard for our IPL Fantasy league (League #6200104, 12 t
 
 ## Features
 
-- **Standings** — current rankings with rank change from Match 1
+- **Standings** — current rankings with rank change from previous match
 - **Prizes** — Top 3 Overall, Master of Boosters, Playoff Champion
 - **Per-Match Leaderboard** — drill into any individual match (including live)
 - **Rank Progression** — line chart showing rank over time
@@ -14,6 +14,30 @@ A live visualization dashboard for our IPL Fantasy league (League #6200104, 12 t
 - **Rank Heatmap** — color-coded rank grid across all matches
 
 > ⚠️ **Live matches** are only shown in the **Per-Match Leaderboard** tab. Standings, Prizes, Rank Progression, Points Race, and Heatmap use **completed matches only** — this avoids skewing aggregates with partial/estimated scores.
+
+---
+
+## Playoff Phase (Match 71–74)
+
+The tournament has two phases:
+
+| Phase | Matches | Transfers |
+|-------|---------|-----------|
+| **League** | M1–M70 (70 matches) | 160 total transfers |
+| **Playoffs** | M71–M74 (Qualifier 1, Eliminator, Qualifier 2, Final) | Fresh 10 transfers |
+
+### What changes after Match 70
+
+- **Unlimited transfers** — after M70 completes, teams can do unlimited transfers to rebuild their playing XI before Qualifier 1 starts
+- **Fresh 10 transfers** — the 160 league transfers are done; playoffs get a new pool of 10
+- **Standings table** — two snapshot column pairs appear:
+  - **M35 Rank / M35 Pts** — frozen standings at mid-season (after match 35)
+  - **League Rank / League Pts** — frozen standings at end of league phase (after match 70)
+- **Transfers Left** — switches from the league pool (e.g., `148/160`) to the playoff pool (e.g., `8/10`)
+- **Playoff Champion prize ($75)** — aggregates points from M71–M74 only
+- **Top 3 Overall** — continues to use cumulative points across all matches (league + playoffs)
+- **Boosters** — work the same across both phases; no reset
+- **Per-match leaderboard, rank progression, points race, rank heatmap** — no changes; playoff matches are additional data points
 
 ---
 

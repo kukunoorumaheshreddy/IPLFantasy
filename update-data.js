@@ -206,8 +206,13 @@
     });
 
     // Derive subsTotal from earliest gameday's subleft (no subs used yet = full allowance)
-    const firstGdKey = gamedayIds.find(g => perMatch[g]);
-    const subsTotal = firstGdKey ? (perMatch[firstGdKey].subsLeft ?? null) : null;
+    // For playoffs (GD >= 71), use the first playoff gameday's subleft as a separate allowance
+    const leagueGdKeys = gamedayIds.filter(g => g <= 70 && perMatch[g]);
+    const playoffGdKeys = gamedayIds.filter(g => g >= 71 && perMatch[g]);
+    const firstLeagueGd = leagueGdKeys.length > 0 ? leagueGdKeys[0] : null;
+    const firstPlayoffGd = playoffGdKeys.length > 0 ? playoffGdKeys[0] : null;
+    const subsTotal = firstLeagueGd ? (perMatch[firstLeagueGd].subsLeft ?? null) : null;
+    const playoffSubsTotal = firstPlayoffGd ? (perMatch[firstPlayoffGd].subsLeft ?? null) : null;
 
     teamData[m.teamName] = {
       perMatch,
@@ -215,6 +220,7 @@
       overallPts: val.ovpts ? parseFloat(val.ovpts) : null,
       boosterCount: val.userbstcnt || 0,
       subsTotal,
+      playoffSubsTotal,
     };
 
     log(`  ${m.teamName}: ${Object.keys(perMatch).length} matches, boosters=${val.userbstcnt || 0}`);
@@ -755,7 +761,9 @@
           subsUsed: td.subsUsed ?? null,
           subsLeft: td.subsLeft ?? null,
           subsThisMatch: td.subsThisMatch ?? null,
-          subsTotal: teamData[m.teamName]?.subsTotal ?? null,
+          subsTotal: gd >= 71
+            ? (teamData[m.teamName]?.playoffSubsTotal ?? null)
+            : (teamData[m.teamName]?.subsTotal ?? null),
           transferCount,
           transferInPts: Math.round(transferInPts * 100) / 100,
           transferEfficiency,
