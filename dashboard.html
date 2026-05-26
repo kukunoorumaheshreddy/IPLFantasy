@@ -1450,10 +1450,8 @@
         let transfersDisplay;
         if (entry.isFreeSquadChange && entry.boosterId == null) {
           transfersDisplay = '<span title="Free playoff rebuild — no transfers charged" style="opacity:0.5;">—</span>';
-        } else if (entry.isFreeSquadChange && entry.boosterId === 11) {
-          transfersDisplay = '<span title="Free Hit — free transfers, squad reverts after match" style="color:#fdcb6e;font-size:11px;font-weight:600;">FH</span>';
         } else if (entry.isFreeSquadChange) {
-          transfersDisplay = '<span title="Wild Card — free transfers" style="color:#fdcb6e;font-size:11px;font-weight:600;">WC</span>';
+          transfersDisplay = '<span title="Free squad change via booster — no transfers charged" style="opacity:0.5;">—</span>';
         } else {
           transfersDisplay = entry.transfers;
         }
