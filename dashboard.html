@@ -1343,6 +1343,7 @@
           activePlayers: entry.activePlayers || [],
           boosterId: entry.boosterId || null,
           transfers: entry.transferCount ?? '—',
+          isFreeSquadChange: entry.isFreeSquadChange || false,
         }))
         .sort((a, b) => b.gdPts - a.gdPts);
 
@@ -1446,6 +1447,17 @@
           ? entry.activePlayers.map(p => `${shortName(p.name)} (${p.pts})`).join(', ')
           : '<span style="opacity:0.3;">—</span>';
 
+        let transfersDisplay;
+        if (entry.isFreeSquadChange && entry.boosterId == null) {
+          transfersDisplay = '<span title="Free playoff rebuild — no transfers charged" style="opacity:0.5;">—</span>';
+        } else if (entry.isFreeSquadChange && entry.boosterId === 11) {
+          transfersDisplay = '<span title="Free Hit — free transfers, squad reverts after match" style="color:#fdcb6e;font-size:11px;font-weight:600;">FH</span>';
+        } else if (entry.isFreeSquadChange) {
+          transfersDisplay = '<span title="Wild Card — free transfers" style="color:#fdcb6e;font-size:11px;font-weight:600;">WC</span>';
+        } else {
+          transfersDisplay = entry.transfers;
+        }
+
         html += `<tr data-team="${entry.name}" onclick="selectTeam('${entry.name}')">
           <td style="font-weight:700;text-align:center;">${medal}</td>
           <td><span class="dot" style="background:${color};margin-right:8px;"></span>${entry.name}</td>
@@ -1458,7 +1470,7 @@
             </div>
           </td>
           <td style="text-align:center;white-space:nowrap;">${overallRankDisplay}</td>
-          <td style="text-align:center;">${entry.transfers}</td>
+          <td style="text-align:center;">${transfersDisplay}</td>
           <td style="text-align:center;">${boosterBadge}</td>
           <td style="font-size:12px;">${capDisplay}</td>
           <td style="font-size:12px;">${vcDisplay}</td>
@@ -1838,7 +1850,7 @@
             count: e.transferCount || 0,
             pts: e.transferInPts || 0,
             free: e.isFreeSquadChange || false,
-            freeLabel: e.isFreeSquadChange ? (e.boosterId === 11 ? 'FH' : 'WC') : '',
+            freeLabel: e.isFreeSquadChange ? (e.boosterId === 11 ? 'FH' : (e.boosterId == null ? 'PR' : 'WC')) : '',
             isLive: gd.isLive || gd.isEstimated,
           });
         });
@@ -1888,7 +1900,7 @@
         matches.forEach(m => {
           const star = m.isLive ? '*' : '';
           if (m.free) {
-            html1 += `<td class="hm-cell" style="background:rgba(231,76,60,0.15);color:#e74c3c;font-size:11px;font-weight:600;" title="Free Hit / Wild Card — skipped">${m.freeLabel}</td>`;
+            html1 += `<td class="hm-cell" style="background:rgba(231,76,60,0.15);color:#e74c3c;font-size:11px;font-weight:600;" title="Free transfers (Free Hit / Wild Card / Playoff Reset) — skipped">${m.freeLabel}</td>`;
           } else if (m.count === 0) {
             html1 += '<td class="hm-cell" style="background:rgba(255,255,255,0.05);color:#888;">—</td>';
           } else {
@@ -1923,7 +1935,7 @@
         matches.forEach(m => {
           const star = m.isLive ? '*' : '';
           if (m.free) {
-            html2 += `<td class="hm-cell" style="background:rgba(231,76,60,0.15);color:#e74c3c;font-size:11px;font-weight:600;" title="Free Hit / Wild Card — skipped">${m.freeLabel}</td>`;
+            html2 += `<td class="hm-cell" style="background:rgba(231,76,60,0.15);color:#e74c3c;font-size:11px;font-weight:600;" title="Free transfers (Free Hit / Wild Card / Playoff Reset) — skipped">${m.freeLabel}</td>`;
           } else if (m.count === 0) {
             html2 += '<td class="hm-cell" style="background:rgba(255,255,255,0.05);color:#888;">—</td>';
           } else {

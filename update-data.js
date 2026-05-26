@@ -659,7 +659,12 @@
         const boosterType = td.boosterId ? (BOOSTER_TYPE[td.boosterId] || null) : null;
         // FREE_HIT/WILD_CARD: no paid transfers — skip diff calculation
         // But only FREE_HIT reverts the squad; WILD_CARD changes are permanent
-        const isFreeSquadChange = boosterType === 'FREE_HIT' || boosterType === 'WILD_CARD';
+        const isBoosterFreeSquadChange = boosterType === 'FREE_HIT' || boosterType === 'WILD_CARD';
+        // Playoff reset: at the start of playoffs (gd 71), every team gets unlimited
+        // free transfers to rebuild before Qualifier 1. Treat the first playoff gd as
+        // a free squad change so the gd70→gd71 diff isn't counted as paid transfers.
+        const isPlayoffReset = gd === 71;
+        const isFreeSquadChange = isBoosterFreeSquadChange || isPlayoffReset;
 
         let transfersIn = [];
         let transfersOut = [];
@@ -759,10 +764,12 @@
           boosterId: td.boosterId || null,
           boosterPoints: bm ? bm.boosterPoints : null,
           subsUsed: td.subsUsed ?? null,
-          subsLeft: td.subsLeft ?? null,
+          subsLeft: gd >= 71
+            ? (td.subsLeft != null && td.subsLeft <= 10 ? td.subsLeft : 10)
+            : (td.subsLeft ?? null),
           subsThisMatch: td.subsThisMatch ?? null,
           subsTotal: gd >= 71
-            ? (teamData[m.teamName]?.playoffSubsTotal ?? null)
+            ? 10
             : (teamData[m.teamName]?.subsTotal ?? null),
           transferCount,
           transferInPts: Math.round(transferInPts * 100) / 100,
